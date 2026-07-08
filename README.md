@@ -37,6 +37,8 @@ public/index.html   Entire UI: styles, markup, and client JS in one file
 package.json        Dependencies and `npm start` script
 replit              Replit run/deploy config (NOTE: missing its leading dot — inactive as-is)
 gitignore           Ignore rules (NOTE: missing its leading dot — inactive as-is)
+kit-inicio/         Student onboarding kit: guided GitHub/SSH setup scripts (Mac +
+                    Windows, in Spanish) plus instructor tools — see kit-inicio/README.md
 docs/               Team docs, including the proposed restructure
 CLAUDE.md           Context file for Claude Code sessions
 ```
