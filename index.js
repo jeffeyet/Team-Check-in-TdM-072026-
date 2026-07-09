@@ -1,5 +1,6 @@
 // AI Leadership Intensive - team portal
 // Day 1: team check-in.  Day 2: prompt log (Google Doc link + revised idea).
+const crypto = require("crypto");
 const express = require("express");
 const Database = require("@replit/database");
 
@@ -8,29 +9,66 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-// Change the passcode by adding a Secret named PASSCODE in Replit (Tools > Secrets).
-const PASSCODE = process.env.PASSCODE || "roster2026";
+// Set a Secret named PASSCODE in Replit (Tools > Secrets). If it's missing,
+// we generate a random one per run instead of shipping a guessable default
+// in the source code.
+const PASSCODE = process.env.PASSCODE || crypto.randomBytes(6).toString("hex");
+if (!process.env.PASSCODE) {
+  console.warn("PASSCODE secret not set. Generated passcode for this run: " + PASSCODE);
+}
 
 function checkCode(req) {
   const code = (req.query.code || (req.body && req.body.code) || "").toString();
   return code === PASSCODE;
 }
 
+// Only allow http/https links so stored fields can't carry a javascript:
+// URI that would execute when an admin clicks the rendered link.
+function sanitizeUrl(u, maxLen) {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  try {
+    const parsed = new URL(s);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return s.slice(0, maxLen);
+  } catch (e) {}
+  return "";
+}
+
+// Basic in-memory rate limit for public, no-passcode endpoints.
+const submitHits = new Map();
+function rateLimit(req, res, next) {
+  const ip = req.ip;
+  const now = Date.now();
+  const windowMs = 60_000;
+  const maxRequests = 10;
+  const hit = submitHits.get(ip) || { count: 0, start: now };
+  if (now - hit.start > windowMs) { hit.count = 0; hit.start = now; }
+  hit.count++;
+  submitHits.set(ip, hit);
+  if (hit.count > maxRequests) return res.status(429).json({ error: "Too many submissions. Try again in a minute." });
+  next();
+}
+
 // ===================== DAY 1: TEAM CHECK-IN =====================
-app.post("/api/submit", async (req, res) => {
+app.post("/api/submit", rateLimit, async (req, res) => {
   try {
     const { teamName, members, idea } = req.body || {};
     if (!teamName || !Array.isArray(members) || members.length === 0 || !idea) {
       return res.status(400).json({ error: "Missing team name, members, or idea." });
     }
+    let pmAssigned = false;
     const clean = {
       teamName: String(teamName).slice(0, 120),
       idea: String(idea).slice(0, 240),
-      members: members.filter(m => m && m.name).slice(0, 6).map(m => ({
-        name: String(m.name).slice(0, 120),
-        linkedin: String(m.linkedin || "").slice(0, 300),
-        isPM: !!m.isPM
-      })),
+      members: members.filter(m => m && m.name).slice(0, 6).map(m => {
+        const isPM = !pmAssigned && !!m.isPM;
+        if (isPM) pmAssigned = true;
+        return {
+          name: String(m.name).slice(0, 120),
+          linkedin: sanitizeUrl(m.linkedin, 300),
+          isPM
+        };
+      }),
       ts: Date.now()
     };
     const key = "team:" + clean.ts + "_" + Math.random().toString(36).slice(2, 7);
@@ -91,16 +129,17 @@ app.get("/api/teamnames", async (req, res) => {
 });
 
 // ===================== DAY 2: PROMPT LOG =====================
-app.post("/api/prompt-submit", async (req, res) => {
+app.post("/api/prompt-submit", rateLimit, async (req, res) => {
   try {
     const { teamName, idea, docUrl } = req.body || {};
-    if (!teamName || !idea || !docUrl) {
-      return res.status(400).json({ error: "Missing team, revised idea, or Google Doc link." });
+    const cleanUrl = sanitizeUrl(docUrl, 500);
+    if (!teamName || !idea || !cleanUrl) {
+      return res.status(400).json({ error: "Missing team, revised idea, or a valid Google Doc link." });
     }
     const clean = {
       teamName: String(teamName).slice(0, 120),
       idea: String(idea).slice(0, 240),
-      docUrl: String(docUrl).slice(0, 500),
+      docUrl: cleanUrl,
       ts: Date.now()
     };
     const key = "prompt:" + clean.ts + "_" + Math.random().toString(36).slice(2, 7);
