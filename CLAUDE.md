@@ -38,13 +38,6 @@ instructor dashboard. Storage is the Replit key-value DB (`team:*` and
 4. The UI is a tiny hand-rolled SPA in one `<script>`: `view` switches between
    `day1`/`day2`/`admin` and `render()` re-draws. It defaults to `day2`.
 
-## Planned refactor
-
-`docs/PROPOSED_STRUCTURE.md` describes the agreed target layout (server/ split,
-public/ split, dotfile renames). It is a **proposal** — confirm with the team
-before executing it, and if you do, update `.replit` and `package.json` entry
-points in the same commit (checklist steps in that doc).
-
 ## Style
 
 - Plain CommonJS (`require`), no TypeScript, no bundler, no new frameworks.

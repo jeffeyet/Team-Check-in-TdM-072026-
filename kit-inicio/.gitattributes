@@ -1,8 +1,0 @@
-# Los archivos de Windows deben viajar con finales de línea CRLF
-# (así funcionan al descargar el ZIP en Windows).
-*.bat text eol=crlf
-*.ps1 text eol=crlf
-
-# Los de Mac/Linux con LF.
-*.sh  text eol=lf
-*.md  text eol=lf
