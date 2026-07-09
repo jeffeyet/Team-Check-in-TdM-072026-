@@ -109,7 +109,7 @@
 const MAX_MEMBERS = 6;
 const $ = (s, el=document) => el.querySelector(s);
 const app = document.getElementById('app');
-let view = 'day2';          // 'day1' | 'day2' | 'admin'  (defaults to today: Tuesday)
+let view = 'day2';          // 'day1' | 'day2' | 'admin' | 'projects'  (defaults to today: Tuesday)
 let unlocked = false;
 let adminCode = '';
 let adminTab = 'prompts';   // 'teams' | 'prompts'
@@ -125,9 +125,14 @@ function header(sub){
       <h1>Course Portal</h1>
       <p>${sub}</p>
     </div>
-    <button class="viewlink" id="switch">${view==='admin'?'&larr; Back':'Instructor view &rarr;'}</button>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <button class="viewlink" id="viewprojects">${view==='projects'?'&larr; Back':'View projects &rarr;'}</button>
+      <button class="viewlink" id="switch">${view==='admin'?'&larr; Back':'Instructor view &rarr;'}</button>
+    </div>
   </header>`;
 }
+function goProjects(){ view = (view==='projects') ? 'day2' : 'projects'; render(); }
+function wireProjectsLink(){ const b=$('#viewprojects'); if(b) b.onclick=goProjects; }
 function dayTabs(){
   return `<div class="daytabs">
     <div class="daytab ${view==='day1'?'active':''}" id="tab-day1"><span class="d">Monday</span>Team Check-In</div>
@@ -139,6 +144,7 @@ function wireDayTabs(){
   if(a) a.onclick=()=>{ view='day1'; render(); };
   if(b) b.onclick=()=>{ view='day2'; render(); };
   $('#switch').onclick=()=>{ view='admin'; render(); };
+  wireProjectsLink();
 }
 
 /* ===================== DAY 1: TEAM CHECK-IN ===================== */
@@ -272,6 +278,7 @@ function confirmScreen(title, sub, againFn, againLabel){
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='admin'; render(); };
+  wireProjectsLink();
   $('#again').onclick=againFn;
 }
 
@@ -288,6 +295,7 @@ function renderGate(){
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
+  wireProjectsLink();
   const go=async()=>{
     const code=$('#f-code').value.trim(); const m=$('#gmsg'); m.className='msg';
     try{
@@ -312,6 +320,7 @@ async function renderAdmin(){
     <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
+  wireProjectsLink();
   $('#at-teams').onclick=()=>{ adminTab='teams'; renderAdmin(); };
   $('#at-prompts').onclick=()=>{ adminTab='prompts'; renderAdmin(); };
   if(adminTab==='teams') await renderTeamsTab();
@@ -374,10 +383,39 @@ async function renderPromptsTab(){
   $('#clear').onclick=async()=>{ if(!confirm('Delete every prompt log?')) return; await fetch('/api/prompt-clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:adminCode})}); renderAdmin(); };
 }
 
+/* ===================== PUBLIC: PROJECTS ===================== */
+async function renderProjects(){
+  app.className=''; app.innerHTML='';
+  const wrap=document.createElement('div'); wrap.className='wrap wide';
+  wrap.innerHTML = header('Every team, and their revised idea after Tuesday.') + `
+    <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
+  app.appendChild(wrap);
+  $('#switch').onclick=()=>{ view='admin'; render(); };
+  wireProjectsLink();
+  const content=$('#content');
+  try{
+    const r=await fetch('/api/projects');
+    const d=await r.json();
+    const projects=d.projects||[];
+    if(projects.length===0){
+      content.innerHTML=`<div class="empty"><h2>No projects yet</h2><p>Team ideas will show up here once they submit their Tuesday prompt log.</p></div>`;
+      return;
+    }
+    content.innerHTML = projects.map(p=>`
+      <div class="team">
+        <div class="team-head"><span class="team-tag mono">${esc(p.teamName)}</span></div>
+        <div class="idea ${p.idea?'':'none'}">${p.idea?esc(p.idea):'No idea submitted yet'}</div>
+      </div>`).join('');
+  }catch(e){
+    content.innerHTML=`<div class="empty"><h2>Could not load projects</h2><p>Try refreshing the page.</p></div>`;
+  }
+}
+
 /* ===================== router ===================== */
 function render(){
   if(view==='admin'){ if(unlocked) renderAdmin(); else renderGate(); }
   else if(view==='day1') renderDay1();
+  else if(view==='projects') renderProjects();
   else renderDay2();
 }
 render();
