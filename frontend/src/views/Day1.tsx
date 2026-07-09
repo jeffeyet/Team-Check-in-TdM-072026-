@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { View } from "../types";
+import type { View, Cohort } from "../types";
 import { Header, DayTabs, ConfirmScreen } from "../ui";
 import { submitTeam } from "../api";
 
@@ -24,10 +24,12 @@ export default function Day1({
   view,
   onSelectDay,
   onSwitch,
+  cohort,
 }: {
   view: View;
   onSelectDay: (v: "day1" | "day2") => void;
   onSwitch: () => void;
+  cohort: Cohort;
 }) {
   const [rows, setRows] = useState<Row[]>(initialRows);
   const [teamName, setTeamName] = useState("");
@@ -87,7 +89,7 @@ export default function Day1({
     }
     setBusy(true);
     try {
-      await submitTeam({ teamName: tn, members, idea: id });
+      await submitTeam(cohort.id, { teamName: tn, members, idea: id });
       setDoneName(tn);
       setDoneCount(members.length);
       setDone(true);
@@ -115,6 +117,7 @@ export default function Day1({
         onAgain={reset}
         view={view}
         onSwitch={onSwitch}
+        group={cohort.label}
       />
     );
   }
@@ -125,6 +128,7 @@ export default function Day1({
         sub="One person per team: add your name, teammates, and your idea."
         view={view}
         onSwitch={onSwitch}
+        group={cohort.label}
       />
       <DayTabs view={view} onSelect={onSelectDay} />
       <div className="card">

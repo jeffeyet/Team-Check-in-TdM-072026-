@@ -29,15 +29,50 @@ las dos primeras las fija el curso; el resto depende de cómo continúe.
 - **Salida:** propuesta presentada; base moderna a paridad en la raíz. Los
   requisitos nuevos de la visión aún no se registran como `aprobado`.
 
-## F2 — Implementación incremental (pendiente)
+## F2 — Implementación incremental (en curso)
 
-- La base para esta fase es ya el **stack moderno en la raíz** (F1). Sobre ella
-  se implementan los CC aprobados en incrementos pequeños. Cada incremento:
-  CC → código → [checklist de humo](pruebas/checklist-humo.md) (más
-  `typecheck`/`build`) → registro actualizado.
-- Orden sugerido por dependencia: actividades como datos → aislamiento por
-  clase → administración fina. **Nada de esto está implementado aún**; la F1
-  entregó la base, no las funcionalidades de la visión.
+La base para esta fase es el **stack moderno en la raíz** (F1). El orden por
+dependencia previsto era: aislamiento por clase → administración fina →
+actividades como datos.
+
+### Implementado · 2026-07-09 ✔
+
+Primer incremento entregado, sobre la misma arquitectura y sin piezas nuevas
+de infraestructura. Verificado con build + typecheck limpios y un smoke test de
+handlers reales sobre KV en memoria (33/33); el servidor real degrada con
+gracia y no cae (ver [pruebas/README.md](pruebas/README.md)).
+
+- **Aislamiento por cohorte.** Índice en la llave `cohorts` y datos por prefijo
+  `cohort:<id>:team:*` / `cohort:<id>:prompt:*`; lecturas siempre por prefijo
+  (se elimina el barrido global O(n)) y **dedupe por cohorte** (corrige la
+  colisión de equipos homónimos entre grupos). Rutas reorganizadas: alumno en
+  `/api/c/*`, instructor en `/api/admin/*`; se eliminaron las rutas globales y
+  el "Clear all" destructivo.
+- **Endurecimiento del acceso.** Passcode por header `X-Passcode` (nunca en la
+  URL), **fail-closed en producción** (obligatorio o 500), comparación
+  timing-safe conservada, descargas por blob y `.gitignore` que ignora `*.csv`.
+- **Seguridad de datos.** Archivar cohorte (borrado suave), borrar envío
+  individual, respaldo completo (`backup.json`) y migración de datos heredados
+  (`migrate-legacy`), en reemplazo del borrado destructivo.
+- **Robustez.** Los handlers capturan errores del KV y responden 500 en vez de
+  tumbar el servidor.
+
+Detalle en [arquitectura.md](arquitectura.md) y [operacion.md](operacion.md).
+El registro formal (CC/ADR de este trabajo) queda pendiente de la sesión de
+equipo; ver [cambios/registro.md](cambios/registro.md).
+
+### Pendiente
+
+- **Actividades como datos:** generalizar el Día 1 / Día 2 a actividades
+  configurables (tipo, título, ventana), para no programar una ruta y una vista
+  por cada actividad nueva. Es la limitación de línea base que sigue vigente.
+- **Sin IA por ahora:** decisión deliberada del equipo; se retomaría solo con
+  una idea realmente creativa.
+
+Cada incremento sigue el ciclo: CC → código →
+[checklist de humo](pruebas/checklist-humo.md) (más `typecheck`/`build`) →
+registro actualizado.
+
 - **Salida:** cada incremento desplegado y verificado en Replit.
 
 ## F3 — Cierre

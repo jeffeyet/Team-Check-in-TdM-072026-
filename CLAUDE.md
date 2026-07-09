@@ -7,31 +7,51 @@ Context for Claude Code sessions working in this repo. Human teammates: read
 
 TypeScript + React portal for the Berkeley Innovation Group AI Leadership
 Intensive: Day 1 team check-in, Day 2 prompt-log submission, passcode-gated
-instructor dashboard. Storage is the Replit key-value DB (`team:*` and
-`prompt:*` keys). Full description and API table: `README.md`.
+instructor dashboard. **Data is isolated per cohort** (one group / edition per
+box). Storage is the Replit key-value DB. Full description and API tables:
+`README.md`.
 
-The modern stack **is the repo root now** — an exact-parity rewrite of the
-earlier single-file app (same `/api` routes, error messages, status codes,
-limits, dedupe, and CSV). See ADR-0003. The old single-file app lives only in
-git history (`git checkout 37760a9 -- index.js public`).
+The TypeScript + React stack **is the repo root**. It began as a parity rewrite
+of the earlier single-file app (ADR-0003); cohort isolation and the security
+hardening below were added afterward, so the app is no longer byte-for-byte
+parity with the original. The old single-file app lives only in git history
+(`git checkout 37760a9 -- index.js public`).
 
 ## Branch policy (important)
 
 - **Work on `Solanum_Branch` only.** Never commit or push to `main` — `main`
   belongs to the instructor's upstream repo (`jeffeyet/Team-Check-in-TdM-072026-`).
 - Before starting: `git checkout Solanum_Branch && git pull`.
-- Commit messages: short imperative subject, e.g. `Split Day 2 routes into prompts router`.
+- Commit messages: short imperative subject, e.g. `Split admin routes per cohort`.
+
+## Cohort data model (the core concept)
+
+- The cohort index is a single KV key, `cohorts` → a JSON array of `Cohort`
+  `{id, label, createdAt, archived}` (`backend/src/types.ts`,
+  `backend/src/services/cohorts.ts`).
+- Per-cohort data lives under key prefixes: `cohort:<id>:team:*` and
+  `cohort:<id>:prompt:*`. **Reads are always scoped by prefix** (there is no
+  global `list()` sweep).
+- **Dedupe is per cohort** (`backend/src/services/teams.ts`): `dedupeTeams`
+  runs over one cohort's already-scoped list, so teams with the same name in
+  different cohorts no longer collide.
+- Students reach a cohort via the `?grupo=<id>` link; the id is a slug derived
+  from the label (`slugify` in `cohorts.ts`).
 
 ## Layout & commands
 
 - `backend/` — Express + TypeScript API (CommonJS, compiled with `tsc`).
-  `src/index.ts` boots the server, mounts both routers under `/api`, and serves
-  `frontend/dist` with an SPA fallback. `src/config.ts` (PASSCODE, PORT),
-  `src/db.ts` (`@replit/database` wrapper), `src/auth.ts` (timing-safe check),
-  `src/lib/`, `src/services/`, `src/routes/`. See `backend/README.md`.
-- `frontend/` — React 18 + TypeScript + Vite SPA. `src/App.tsx` is a
-  state-based router (default view `day2`); `src/views/` holds Day1/Day2/Admin;
-  `src/api.ts` is the typed fetch client; `src/styles.css` is ported verbatim.
+  `src/index.ts` boots the server, mounts the student router at `/api/c` and the
+  admin router at `/api/admin`, and serves `frontend/dist` with an SPA fallback.
+  `src/config.ts` (PASSCODE fail-closed posture, PORT), `src/db.ts`
+  (`@replit/database` wrapper), `src/auth.ts` (header-based, timing-safe check),
+  `src/lib/`, `src/services/` (`cohorts.ts`, `teams.ts`, `prompts.ts`),
+  `src/routes/` (`student.ts`, `admin.ts`). See `backend/README.md`.
+- `frontend/` — React 18 + TypeScript + Vite SPA. `src/App.tsx` reads
+  `?grupo=<id>`, verifies the cohort (`getCohort`), and shows a group-code gate
+  if it is missing/archived; `src/views/` holds Day1/Day2/Admin;
+  `src/api.ts` is the typed fetch client (centralizes the `X-Passcode` header
+  and blob downloads); `src/ui.tsx` holds Header/DayTabs/GroupGate/etc.
   See `frontend/README.md`.
 - `docs/` — team docs in Spanish: requirements, change control, ADRs, tests,
   ops. Start at `docs/README.md`.
@@ -43,37 +63,69 @@ git history (`git checkout 37760a9 -- index.js public`).
   - `npm run dev:frontend` — Vite on :5173, proxies `/api` → :3000.
   - `npm run typecheck` — `tsc --noEmit` (backend).
 
-## Known quirks (verified July 2026)
+## Access & security (verified July 2026)
+
+1. **Passcode by header, never query string.** The passcode arrives in the
+   `X-Passcode` header (preferred) or `{code}` in a POST body — never in a URL
+   (`backend/src/auth.ts`). The front sends it the same way, including for
+   downloads, which use fetch + blob so nothing lands in URLs/history
+   (`frontend/src/api.ts`).
+2. **Fail-closed in production.** If `NODE_ENV=production` or `REPLIT_DEPLOYMENT`
+   is set and `PASSCODE` is not configured, admin routes return
+   `500 "Server passcode not configured."`. In development the default
+   `roster2026` is used with a loud startup warning
+   (`backend/src/config.ts: warnPasscodeAtStartup`). Comparison is timing-safe
+   SHA-256. There is no session state — every request is checked.
+3. **One instructor passcode; student isolation is by cohort link.** No student
+   accounts.
+4. `.gitignore` ignores `*.csv` so exported rosters (PII) are never committed to
+   the public fork.
+
+## Data safety (no destructive clear-all)
+
+- **Archive** a cohort = soft delete (`archived:true`), data kept.
+- **Delete a single submission** by key (verified to belong to the cohort).
+- **Backup** everything: `GET /api/admin/backup.json`.
+- **Migrate legacy** unprefixed `team:*`/`prompt:*` keys into a cohort:
+  `POST /api/admin/migrate-legacy` (adoption without loss).
+
+## Known quirks
 
 1. **DB writes fail outside Replit.** `@replit/database` needs `REPLIT_DB_URL`,
-   which only exists in a Replit workspace. Locally the UI loads and
-   `/api/teamnames` returns `{"names":[]}`, but `/api/submit` returns
-   `{"error":"Save failed."}`. Do not chase this as a bug; test real
-   reads/writes on Replit.
-2. Instructor passcode is `process.env.PASSCODE || "roster2026"`, checked per
-   request via query param or JSON body (`code`). There is no session state.
-3. The SPA defaults to `day2`. `App.tsx` switches `view` between
-   `day1`/`day2`/`admin`; the admin dashboard defaults to the `prompts` tab.
+   which only exists in a Replit workspace. Locally the UI loads and reads come
+   back empty, but writes return `Save failed.`. Handlers catch KV errors and
+   return `500` / empty lists rather than crashing the server. Do not chase this
+   as a bug; test real reads/writes on Replit.
+2. The SPA's default student view is `day2`; the admin dashboard's default tab
+   is `prompts`.
+
+## No AI (deliberate)
+
+The team deliberately did **not** integrate any AI feature. Do not add one
+speculatively; it would only be revisited for a genuinely creative use.
 
 ## Docs & process (docs/, in Spanish)
 
 - **Scope changes go through a change request first**: add a `CC-###` in
-  `docs/cambios/` (template + registro there) before touching code, and
+  `docs/cambios/` (template + `registro.md` there) before touching code, and
   reference the CC id in commit messages.
-- Requirements live in `docs/requerimientos/` (RF/RNF/RES). The current
-  content is the implemented baseline, each item citing `file:lines`; new
-  features enter as `propuesto` via a CC. Keep them in sync with code.
+- Requirements live in `docs/requerimientos/` (RF/RNF/RES), each item citing
+  `file:lines`; keep them in sync with code.
 - Durable technical decisions get an ADR in `docs/decisiones/`. Current
-  direction: ADR-0003 — modern stack (TypeScript + Express, React + Vite, one
-  Replit service, Replit KV kept), done as an in-place rewrite at the repo
-  root. It supersedes ADR-0002 (evolve the single-file app in place, no build
-  step), which superseded ADR-0001 (separate front/back + PostgreSQL).
+  accepted direction is **ADR-0003** (modern TS+Express / React+Vite stack at
+  the repo root, Replit KV kept), which supersedes 0002 and 0001.
+- Change-control baseline: **CC-001** (documentation restructure) and
+  **CC-002** (modern stack) are implemented. As of `registro.md`, the CCs and
+  any ADR for the **cohort-isolation and security-hardening** work are still
+  **pending** ("se registrarán tras la sesión de equipo del 2026-07-09"). If you
+  formalize that work, add the CC/ADR and update `registro.md` and the ADR index
+  — do not cite a CC/ADR number that does not yet exist on disk.
 - Before deploying, run `docs/pruebas/checklist-humo.md` end to end.
 
 ## Style
 
 - TypeScript throughout. Backend is CommonJS (compiled by `tsc`); frontend is
   ES modules + React function components bundled by Vite.
-- Match the existing terse style; keep user-facing strings identical (UI-string
-  parity with the original app is a hard requirement).
-- API responses follow the existing shape: `{ok: true}` or `{error: "..."}`.
+- Match the existing terse style. API responses follow the existing shape:
+  `{ok: true}` / `{cohort|teams|logs|names|...}` on success, `{error: "..."}` on
+  failure (CSV/text routes send plain-text errors).

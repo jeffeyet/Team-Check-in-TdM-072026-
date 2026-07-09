@@ -25,3 +25,12 @@ export interface PromptLog {
 export interface PromptLogRecord extends PromptLog {
   key: string;
 }
+
+// A cohort is one isolated data box (group / edition). Its members' data lives
+// under the "cohort:<id>:team:*" and "cohort:<id>:prompt:*" key prefixes.
+export interface Cohort {
+  id: string;
+  label: string;
+  createdAt: number;
+  archived: boolean;
+}

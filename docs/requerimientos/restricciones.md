@@ -24,7 +24,14 @@ requiere CC y, si es técnica, ADR. Convenciones: [README.md](README.md).
   comportamiento verificado de `@replit/database`. El
   [ADR-0003](../decisiones/0003-stack-moderno-typescript-react.md) mantiene
   esta restricción: la reescritura conserva Replit KV como único
-  almacenamiento (llaves `team:*` y `prompt:*`, vía `backend/src/db.ts`).
+  almacenamiento, vía `backend/src/db.ts`.
+- **Nota (2026-07-09, [CC-003](../cambios/CC-003-cohortes.md)):** la restricción sigue
+  **vigente**; el aislamiento por cohorte se implementa **sobre el mismo KV**,
+  sin base de datos nueva. Cambió el esquema de llaves: un índice único
+  `cohorts` (array JSON de cohortes) y datos por cohorte bajo los prefijos
+  `cohort:<id>:team:*` y `cohort:<id>:prompt:*`
+  (`backend/src/services/cohorts.ts:5,8-16`). Las llaves heredadas `team:*` /
+  `prompt:*` siguen siendo legibles (ver RES-005).
 
 ## RES-003 · Stack moderno sobre Replit, sin infraestructura nueva
 
@@ -54,8 +61,19 @@ requiere CC y, si es técnica, ADR. Convenciones: [README.md](README.md).
   seguir siendo legibles mientras la edición esté en curso; cualquier
   migración de formato incluye su plan para estos datos.
 - **Origen:** la app está en uso durante el curso (contexto relatado por el
-  equipo). La reescritura del ADR-0003 conserva el mismo formato de llaves y
+  equipo). La reescritura del ADR-0003 conservó el mismo formato de llaves y
   de valores (verificado por paridad).
+- **Cumplimiento (2026-07-09, [CC-003](../cambios/CC-003-cohortes.md)):** el
+  aislamiento por cohorte introdujo el prefijo `cohort:<id>:…` para los datos
+  nuevos, pero **no rompe** los datos heredados: las llaves sin prefijo
+  `team:*` / `prompt:*` siguen existiendo en el KV y la restricción se satisface
+  mediante una migración explícita —`POST /api/admin/migrate-legacy`
+  ([RF-017](funcionales.md#rf-017--migración-de-datos-heredados-a-una-cohorte-instructor))—
+  que mueve esas llaves a la caja de una cohorte sin pérdida (crea la cohorte si
+  falta, mueve valor por valor y borra la original). El valor de cada registro
+  conserva su formato. Esto reemplaza la garantía de "solo lectura por paridad"
+  por un plan de migración concreto y ejecutable.
+- **Fuente:** `backend/src/services/cohorts.ts:124-146` (`migrateLegacy`).
 
 ## RES-006 · Plazo de la propuesta
 

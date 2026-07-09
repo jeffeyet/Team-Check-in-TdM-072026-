@@ -2,10 +2,13 @@
 
 Planeación y proceso del desarrollo de la app, que vive **en la raíz** del repo
 (backend TypeScript + Express en `backend/`, frontend React + Vite en
-`frontend/`) y corre en Replit como un solo servicio. Este stack moderno
-reemplazó **a paridad** a la app anterior de un solo archivo (ver
+`frontend/`) y corre en Replit como un solo servicio. Este stack moderno empezó
+como una reescritura **a paridad** de la app anterior de un solo archivo (ver
 [ADR-0003](decisiones/0003-stack-moderno-typescript-react.md); la versión previa
-quedó en git, commit `37760a9`). Esta carpeta sustituye al plan anterior
+quedó en git, commit `37760a9`); sobre esa base, el **2026-07-09** se agregó el
+**aislamiento por cohorte** (grupos con datos separados), el endurecimiento del
+acceso y la seguridad de datos, así que ya no es paridad exacta con el original
+(ver [arquitectura.md](arquitectura.md)). Esta carpeta sustituye al plan anterior
 `checkin-platform/` (ver [ADR-0002](decisiones/0002-evolucion-replit-nativa.md)).
 
 ## Orden de lectura sugerido
@@ -28,7 +31,7 @@ quedó en git, commit `37760a9`). Esta carpeta sustituye al plan anterior
 | [cambios/](cambios/README.md) | Control de cambios: cómo se propone, aprueba y registra un cambio (CC) |
 | [decisiones/](decisiones/README.md) | Decisiones de arquitectura (ADR) |
 | [notas/](notas/README.md) | Minutas de reunión del equipo |
-| [pruebas/](pruebas/README.md) | Estrategia de verificación y checklist de humo |
+| [pruebas/](pruebas/README.md) | Estrategia de verificación: estática, smoke test automatizado y checklist de humo |
 | [operacion.md](operacion.md) | Correr, desplegar y respaldar la app |
 
 ## Reglas del proceso

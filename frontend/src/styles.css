@@ -29,6 +29,7 @@ label.lab .req{color:var(--gold-deep)}
 .hint{font-weight:400;text-transform:none;letter-spacing:normal;color:var(--muted);font-size:12px;margin-left:6px}
 input[type=text],input[type=url],textarea{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:15px;color:var(--ink);background:#fffdf8;transition:border-color .15s, box-shadow .15s;}
 input:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,167,35,.18)}
+input[readonly]{background:#efece4;color:var(--ink-2);cursor:default}
 textarea{resize:vertical;min-height:64px}
 .countrow{display:flex;justify-content:space-between;margin-top:6px}
 .count{font-size:12px;color:var(--muted)}
@@ -71,7 +72,7 @@ textarea{resize:vertical;min-height:64px}
 .toolbar .spacer{flex:1}
 .team{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px 22px;margin-bottom:16px}
 .team-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.team-tag{font-size:12px;letter-spacing:.08em;background:var(--ink);color:#fff;padding:4px 10px;border-radius:6px}
+.team-tag{font-size:12px;letter-spacing:.08em;background:rgba(0,36,63,.06);color:var(--ink-2);font-weight:600;padding:4px 10px;border-radius:6px;cursor:default}
 .team-count{font-size:12px;color:var(--muted)}
 .idea{font-size:16px;font-style:italic;color:var(--ink-2);border-left:3px solid var(--gold);padding:2px 0 2px 14px;margin:6px 0 16px}
 .idea.none{color:var(--muted);font-style:normal;border-color:var(--line)}

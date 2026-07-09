@@ -4,10 +4,14 @@ Línea base redactada desde el código el 2026-07-08. El 2026-07-09 las
 referencias de **Fuente** se remapearon al stack moderno
 ([ADR-0003](../decisiones/0003-stack-moderno-typescript-react.md)), que ahora
 vive en la raíz (`backend/` Express + TypeScript, `frontend/` React + Vite).
-El comportamiento es paridad exacta con la app anterior; solo cambió dónde
-vive el código. **Excepción:** RNF-001 y RNF-003 describen el propio stack y
-la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
-(ver notas en cada uno). Convenciones: [README.md](README.md).
+
+**Actualización 2026-07-09 ([CC-003](../cambios/CC-003-cohortes.md), [CC-004](../cambios/CC-004-seguridad-acceso.md), [ADR-0004](../decisiones/0004-aislamiento-por-cohorte.md)):**
+el aislamiento por cohorte y el endurecimiento del acceso agregaron cuatro
+requisitos nuevos —**RNF-007 … RNF-010**— y resolvieron dos "límites conocidos"
+de la línea base (passcode en query string y borrado sin respaldo), que se
+actualizan al final del documento. Las **Fuente** de los RNF de línea base se
+ajustaron a las líneas actuales del código reorganizado. Convenciones:
+[README.md](README.md).
 
 ---
 
@@ -25,7 +29,7 @@ la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
     (`express`, `@replit/database`).
   - El frontend usa solo React (`react`, `react-dom`) como dependencias de
     producción; sin librerías de estado, routing ni UI adicionales.
-- **Estado:** implementado (línea base, redacción actualizada por ADR-0003).
+- **Estado:** implementado (redacción actualizada por ADR-0003).
 - **Fuente:** `package.json` (raíz: scripts `build`/`start`),
   `backend/package.json` (2 deps de producción),
   `frontend/package.json` (solo React), `.replit` (un solo servicio).
@@ -41,10 +45,11 @@ la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
 - **Descripción:** la comparación del passcode no filtra información por
   tiempo de respuesta.
 - **Criterios de aceptación:** la comparación usa hashes SHA-256 y
-  `crypto.timingSafeEqual`, con longitud constante.
-- **Estado:** implementado (línea base).
-- **Fuente:** `backend/src/auth.ts:7-9` (hash SHA-256 de ambos valores y
-  `crypto.timingSafeEqual`).
+  `crypto.timingSafeEqual`, con longitud constante (los digests SHA-256 tienen
+  siempre 32 bytes, sin retorno temprano).
+- **Estado:** implementado.
+- **Fuente:** `backend/src/auth.ts:16-21` (`checkCode`: hash SHA-256 de ambos
+  valores y `crypto.timingSafeEqual`).
 
 ## RNF-003 · Neutralización de HTML en datos de usuario
 
@@ -53,11 +58,12 @@ la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
 - **Criterios de aceptación:** un nombre de equipo como `<b>hola</b>` se
   muestra literal, sin interpretarse como HTML (cubierto por el paso 6 de la
   [checklist de humo](../pruebas/checklist-humo.md)).
-- **Estado:** implementado (línea base, redacción actualizada por ADR-0003).
+- **Estado:** implementado (redacción actualizada por ADR-0003).
 - **Fuente:** el escape lo da automáticamente React al renderizar los datos
-  con `{valor}` (JSX): p. ej. `frontend/src/views/Admin.tsx:166` (nombre de
-  equipo), `:170` (idea), `:176` (nombre de miembro), `:297` (idea revisada).
-  No se usa `dangerouslySetInnerHTML` en ningún archivo de `frontend/src`.
+  con `{valor}` (JSX): p. ej. `frontend/src/views/Admin.tsx:370` (nombre de
+  equipo), `:383-385` (idea), `:389` (nombre de miembro), `:497` (idea
+  revisada). No se usa `dangerouslySetInnerHTML` en ningún archivo de
+  `frontend/src`.
 - **Nota:** el [ADR-0003](../decisiones/0003-stack-moderno-typescript-react.md)
   cambió el mecanismo. Antes el escape era manual, con la función `esc()` del
   frontend de un solo archivo; ahora lo garantiza el escape por defecto de
@@ -69,11 +75,12 @@ la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
   máximas, independientemente de lo que valide la interfaz.
 - **Criterios de aceptación:** nombre de equipo ≤120, idea ≤240, nombre de
   miembro ≤120, LinkedIn ≤300, enlace de documento ≤500 caracteres; máximo
-  6 miembros por equipo.
-- **Estado:** implementado (línea base).
-- **Fuente:** `backend/src/routes/teams.ts:24-38` (equipo/idea/miembro/LinkedIn
-  y `.slice(0, 6)` de miembros), `backend/src/routes/prompts.ts:19-24`
-  (equipo/idea/enlace del Día 2).
+  6 miembros por equipo. Además, la etiqueta de cohorte se trunca a 120.
+- **Estado:** implementado.
+- **Fuente:** `backend/src/routes/student.ts:47-61` (equipo/idea/miembro/LinkedIn
+  y `.slice(0, 6)` de miembros en el Día 1), `:80-85` (equipo/idea/enlace del
+  Día 2); `backend/src/services/cohorts.ts:54` y `:81-82` (etiqueta de cohorte
+  a 120).
 
 ## RNF-005 · Operable con teclado (parcial)
 
@@ -82,26 +89,95 @@ la técnica de escape, que sí cambiaron con ADR-0003; su texto se actualizó
 - **Criterios de aceptación:** las pestañas (día y admin) tienen
   `role="tab"`, `aria-selected` y responden a Enter/Espacio; los campos de
   formulario tienen `label`.
-- **Estado:** implementado (línea base). Cobertura parcial: no se ha hecho
-  una auditoría completa de accesibilidad.
+- **Estado:** implementado. Cobertura parcial: no se ha hecho una auditoría
+  completa de accesibilidad.
 - **Fuente:** `frontend/src/ui.tsx:5-12` (`keyActivate`, Enter/Espacio) y
-  `:39-72` (`DayTabs` con `role="tab"`/`aria-selected`);
-  `frontend/src/views/Admin.tsx:13-20` (`keyActivate`) y `:388-411` (pestañas
+  `:47-80` (`DayTabs` con `role="tab"`/`aria-selected`);
+  `frontend/src/views/Admin.tsx:19-26` (`keyActivate`) y `:617-640` (pestañas
   del panel de instructor); `label` con `htmlFor` en los formularios
-  (`frontend/src/views/Day1.tsx:132,144,207`,
-  `frontend/src/views/Day2.tsx:88,106,124`).
+  (`frontend/src/views/Day1.tsx:136,181,211`,
+  `frontend/src/views/Day2.tsx:92,110,128`).
 
 ## RNF-006 · Escala del curso
 
 - **Descripción:** el sistema atiende la escala real del curso (decenas de
-  equipos) sin optimizaciones adicionales.
+  equipos por cohorte) sin optimizaciones adicionales.
 - **Criterios de aceptación:** las vistas de instructor cargan en tiempos
-  razonables con decenas de registros, aun cuando cada consulta lee el KV
-  llave por llave (O(n) `get`s por request).
-- **Estado:** implementado (línea base).
-- **Fuente:** `backend/src/services/teams.ts:4-13` (`loadTeams`: un `get` por
-  cada llave `team:`), `backend/src/services/prompts.ts:4-17` (`loadPrompts`:
-  un `get` por cada llave `prompt:`).
+  razonables con decenas de registros. Cada consulta lee el KV llave por llave
+  (O(n) `get`s por request), pero **acotado al prefijo de la cohorte**: ya no
+  hay un barrido global de todas las llaves como en la línea base.
+- **Estado:** implementado (actualizado por CC-003: lecturas por prefijo de
+  cohorte).
+- **Fuente:** `backend/src/services/teams.ts:6-15` (`loadTeams`: un `get` por
+  cada llave `cohort:<id>:team:`), `backend/src/services/prompts.ts:6-19`
+  (`loadPrompts`: un `get` por cada llave `cohort:<id>:prompt:`),
+  `backend/src/services/cohorts.ts:8-16` (helpers de prefijo).
+
+---
+
+## RNF-007 · Fail-closed del passcode en producción
+
+- **Descripción:** en producción, la ausencia de un passcode configurado
+  deshabilita por completo el acceso de instructor, en vez de recurrir a un
+  default débil.
+- **Criterios de aceptación:**
+  - Si `NODE_ENV=production` o existe `REPLIT_DEPLOYMENT`, y `PASSCODE` no está
+    definido (o está vacío), toda ruta de admin responde 500
+    `Server passcode not configured.` (JSON o texto según la ruta).
+  - En desarrollo (sin producción y sin `PASSCODE`) se usa el default
+    `roster2026` con una advertencia clara al arranque.
+- **Estado:** implementado.
+- **Fuente:** `backend/src/config.ts:6-15` (`IS_PRODUCTION`,
+  `PASSCODE_CONFIGURED`, `PASSCODE`), `:20-32` (`warnPasscodeAtStartup`),
+  `backend/src/auth.ts:24-26` (`passcodeUnavailable`), `:30-32` y `:39-41`
+  (respuesta 500 en `requirePasscode`/`requirePasscodeText`).
+
+## RNF-008 · Passcode fuera de la URL
+
+- **Descripción:** el passcode nunca viaja por la query string, para que no
+  quede en URLs, historiales de navegador ni logs de acceso.
+- **Criterios de aceptación:**
+  - El servidor lee el passcode solo del header `X-Passcode` o del body JSON
+    (`code`); nunca de `req.query`.
+  - El cliente envía el passcode por el header `X-Passcode` en todas las rutas
+    de admin, y las descargas (CSV, backup) se hacen por `fetch`+blob, sin
+    `?code=` en la URL.
+- **Estado:** implementado.
+- **Fuente:** `backend/src/auth.ts:8-13` (`readCode`: header o body, nunca
+  query); `frontend/src/api.ts:9-16` (`authHeaders` con `X-Passcode`),
+  `:193-233` (`downloadBlob` y exports/backup por blob con el header).
+
+## RNF-009 · Higiene de secretos y datos exportados
+
+- **Descripción:** los exports con datos personales (PII) no se versionan; el
+  passcode real no vive en el repositorio.
+- **Criterios de aceptación:**
+  - `.gitignore` ignora `*.csv`, de modo que los CSV exportados (que contienen
+    nombres, LinkedIn e ideas) no se suben al fork público.
+  - El passcode de producción se provee por Secret (`PASSCODE`), no en código
+    (el default `roster2026` es solo para desarrollo; ver RNF-007).
+- **Estado:** implementado.
+- **Fuente:** `.gitignore:6` (`*.csv`); `backend/src/config.ts:1-15`
+  (`PASSCODE` desde `process.env`, default solo en desarrollo).
+
+## RNF-010 · Degradación ante fallo del KV (no crashea el servidor)
+
+- **Descripción:** un fallo de lectura o escritura del KV se contiene en el
+  handler y no derriba el proceso; el cliente recibe un error controlado.
+- **Criterios de aceptación:**
+  - Toda ruta que toca el KV está envuelta en `try/catch`: en error devuelve un
+    status apropiado (500 `Save failed.` / `Load failed.` / `Export failed.` /
+    `Backup failed.` / etc.) sin propagar la excepción.
+  - `GET /api/c/:cohort/teamnames` degrada a `{names: []}` en cualquier error,
+    para que el formulario del Día 2 siga funcionando.
+  - Fuera de Replit (sin `REPLIT_DB_URL`) las escrituras fallan de forma
+    esperada como `Save failed.` y las lecturas devuelven vacío, sin crash.
+- **Estado:** implementado.
+- **Fuente:** `backend/src/routes/student.ts:12-18,31-33,38-66,71-90`
+  (try/catch por handler; `{names:[]}` en `:32`),
+  `backend/src/routes/admin.ts:24-35,40-47,52-59,64-70,75-81,89-118,126-145,153-163,168-174,179-186,191-198`
+  (try/catch en cada ruta de admin), `backend/src/db.ts:3-5` (cliente único;
+  el fallo fuera de Replit es esperado y se maneja arriba).
 
 ---
 
@@ -111,11 +187,21 @@ Comportamientos reales de la app hoy que la línea base **no** garantiza como
 cualidades (registrados aquí como hechos, no como trabajo planeado; su
 priorización futura se decide en [F1 del roadmap](../roadmap.md)):
 
-- El passcode es único y compartido; viaja como query param en varias rutas
-  (queda en historiales y logs de acceso).
 - No hay rate limiting en ningún endpoint (envíos públicos ni intentos de
   passcode).
-- "Clear" no tiene deshacer ni papelera; el único respaldo es descargar los
-  CSV antes (ver [operacion.md](../operacion.md)).
-- Los re-envíos del Día 1 dejan llaves antiguas en el KV que ya no se
-  muestran (solo la más reciente por nombre), pero siguen ocupando espacio.
+- Los re-envíos del Día 1 dejan llaves antiguas en el KV que ya no se muestran
+  (solo la más reciente por nombre **dentro de la cohorte**), pero siguen
+  ocupando espacio. El instructor puede borrarlas una a una (RF-014).
+- El aislamiento entre cohortes es por *conocimiento del id* del grupo: quien
+  conozca (o adivine) el slug de una cohorte activa puede escribir en ella y
+  leer sus nombres de equipo por `GET /api/c/:cohort/teamnames` (rutas de alumno
+  sin passcode, por diseño). Las vistas de instructor sí exigen passcode.
+
+### Resueltos el 2026-07-09 (antes eran límites; ya no aplican)
+
+- **Passcode en query string** → resuelto por RNF-008: el passcode viaja por el
+  header `X-Passcode` (o body), nunca por la URL.
+- **"Clear" sin deshacer ni respaldo** → resuelto por CC-003: se eliminó el
+  borrado total destructivo (antiguo [RF-008](funcionales.md#rf-008--borrado-total-por-día--reemplazado))
+  y se sustituyó por archivar cohorte / borrado suave (RF-015), borrado
+  individual de envíos (RF-014) y respaldo completo JSON (RF-016).

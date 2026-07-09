@@ -36,15 +36,28 @@ historial de git, en el commit `37760a9`; se recupera con
 `git checkout 37760a9 -- index.js public`. Ya no hay copia en el árbol de
 trabajo.
 
+Sobre esa base moderna, el **2026-07-09** el equipo agregó el manejo de
+**múltiples grupos (cohortes) con datos aislados e histórico**: cada grupo es
+una caja de datos separada, el instructor comparte un enlace por grupo, y
+reutilizar la app en otra edición ya no implica perder los datos anteriores
+(archivar en vez de borrar). Ver [arquitectura.md](arquitectura.md) y
+[operacion.md](operacion.md).
+
 ## Cómo funciona hoy
 
-- **Día 1 — Team Check-In:** un integrante registra nombre del equipo, hasta
-  6 miembros (LinkedIn opcional, un PM marcado) y la idea en una frase.
+- **Grupos (cohortes):** el instructor crea un grupo, obtiene un enlace
+  (`/?grupo=<id>`) y lo comparte. Los datos de cada grupo quedan aislados de los
+  demás; los grupos viejos se pueden archivar sin borrar su histórico.
+- **Día 1 — Team Check-In:** un integrante registra, **dentro de su grupo**,
+  nombre del equipo, hasta 6 miembros (LinkedIn opcional, un PM marcado) y la
+  idea en una frase.
 - **Día 2 — Prompt Log:** el equipo envía el enlace a su Google Doc con 20
   prompts y la idea revisada; el nombre del equipo se autocompleta con los
-  registros del Día 1.
-- **Vista instructor:** protegida con un passcode compartido; muestra
-  estadísticas, tarjetas por equipo, export CSV y "borrar todo" por día.
+  registros del Día 1 de ese mismo grupo.
+- **Vista instructor:** protegida con un passcode (enviado por header, nunca en
+  la URL); lista los grupos, y por grupo muestra estadísticas, tarjetas por
+  equipo, export CSV, borrado de un envío individual, archivar el grupo y
+  respaldo completo en JSON. El "borrar todo" destructivo ya no existe.
 
 Detalle técnico: [arquitectura.md](arquitectura.md); tabla completa del API:
 [`README.md` de la raíz](../README.md).
@@ -58,21 +71,29 @@ Detalle técnico: [arquitectura.md](arquitectura.md); tabla completa del API:
 - Nuestro equipo (Solanum) trabaja en la rama `Solanum_Branch`; `main`
   pertenece al upstream del instructor.
 
-## Limitaciones observadas (verificadas en el código)
+## Estado de las limitaciones de la línea base
 
-1. **Actividades fijas en el código** — agregar la actividad del Día 3 exige
-   programar rutas y vista nuevas (una ruta en `backend/src/routes/` y una vista
-   en `frontend/src/views/`). El stack cambió, pero la actividad sigue siendo
-   código, no dato configurable.
-2. **Sin noción de "clase"** — las llaves del KV son globales (`team:*`,
-   `prompt:*`); dos grupos usando la misma instancia se mezclarían.
-3. **Un passcode compartido** para cualquier instructor, sin cuentas ni
-   sesiones (`backend/src/config.ts`, `backend/src/auth.ts`).
-4. **Borrado de todo o nada** — el único mantenimiento de datos es "Clear"
-   por día; no hay borrado individual, y reutilizar la app en otra edición
-   implica perder el histórico.
+El diagnóstico original de la línea base (base del plan de Iker,
+`checkin-platform/`, hoy absorbido en esta carpeta — ver
+[ADR-0002](decisiones/0002-evolucion-replit-nativa.md)) listaba cuatro
+limitaciones. Con la implementación del 2026-07-09, tres se resolvieron:
 
-Estas limitaciones son la base de la [visión](vision.md). El diagnóstico
-proviene del plan original de Iker (`checkin-platform/`, hoy absorbido en
-esta carpeta — ver [ADR-0002](decisiones/0002-evolucion-replit-nativa.md)) y
-se verificó contra el código.
+1. **Actividades fijas en el código** — *sigue vigente*. Agregar la actividad
+   del Día 3 exige programar una ruta y una vista nuevas. La actividad sigue
+   siendo código, no dato configurable (queda como trabajo futuro en el
+   [roadmap](roadmap.md)).
+2. **Sin noción de "clase"** — *resuelto*. Las llaves del KV se prefijan por
+   cohorte (`cohort:<id>:team:*` / `prompt:*`) y las lecturas son por prefijo;
+   los grupos ya no se mezclan (`backend/src/services/cohorts.ts`,
+   `teams.ts`, `prompts.ts`).
+3. **Un passcode compartido, sin cuentas** — *mitigado*. Sigue siendo un solo
+   passcode de instructor (decisión deliberada: el profesor es el único admin),
+   pero ahora viaja por el header `X-Passcode` (nunca en la URL) y es
+   obligatorio en producción (fail-closed) (`backend/src/auth.ts`,
+   `backend/src/config.ts`).
+4. **Borrado de todo o nada** — *resuelto*. Hay borrado por envío individual,
+   archivar la cohorte (borrado suave) y respaldo completo en JSON; reutilizar
+   la app en otra edición ya no implica perder el histórico
+   (`backend/src/routes/admin.ts`, `backend/src/services/cohorts.ts`).
+
+Estas limitaciones fueron la base de la [visión](vision.md).

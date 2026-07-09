@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { View } from "../types";
+import type { View, Cohort } from "../types";
 import { Header, DayTabs, ConfirmScreen } from "../ui";
 import { getTeamNames, submitPrompt } from "../api";
 
@@ -7,10 +7,12 @@ export default function Day2({
   view,
   onSelectDay,
   onSwitch,
+  cohort,
 }: {
   view: View;
   onSelectDay: (v: "day1" | "day2") => void;
   onSwitch: () => void;
+  cohort: Cohort;
 }) {
   const [teamName, setTeamName] = useState("");
   const [docUrl, setDocUrl] = useState("");
@@ -22,8 +24,8 @@ export default function Day2({
   const [doneName, setDoneName] = useState("");
 
   useEffect(() => {
-    getTeamNames().then(setNames);
-  }, []);
+    getTeamNames(cohort.id).then(setNames);
+  }, [cohort.id]);
 
   async function submit() {
     setMsg("");
@@ -44,7 +46,7 @@ export default function Day2({
     }
     setBusy(true);
     try {
-      await submitPrompt({ teamName: tn, idea: id, docUrl: du });
+      await submitPrompt(cohort.id, { teamName: tn, idea: id, docUrl: du });
       setDoneName(tn);
       setDone(true);
     } catch {
@@ -71,6 +73,7 @@ export default function Day2({
         onAgain={reset}
         view={view}
         onSwitch={onSwitch}
+        group={cohort.label}
       />
     );
   }
@@ -81,6 +84,7 @@ export default function Day2({
         sub="Log your 20-prompt session and your revised idea."
         view={view}
         onSwitch={onSwitch}
+        group={cohort.label}
       />
       <DayTabs view={view} onSelect={onSelectDay} />
       <div className="card">
