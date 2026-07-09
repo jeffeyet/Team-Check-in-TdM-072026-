@@ -117,6 +117,7 @@ let lastTeams = [];
 let lastLogs = [];
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function keyActivate(el){ if(el) el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); } }); }
 
 function header(sub){
   return `<header>
@@ -129,15 +130,16 @@ function header(sub){
   </header>`;
 }
 function dayTabs(){
-  return `<div class="daytabs">
-    <div class="daytab ${view==='day1'?'active':''}" id="tab-day1"><span class="d">Monday</span>Team Check-In</div>
-    <div class="daytab ${view==='day2'?'active':''}" id="tab-day2"><span class="d">Tuesday</span>Prompt Log</div>
+  return `<div class="daytabs" role="tablist">
+    <div class="daytab ${view==='day1'?'active':''}" id="tab-day1" role="tab" tabindex="0" aria-selected="${view==='day1'}"><span class="d">Monday</span>Team Check-In</div>
+    <div class="daytab ${view==='day2'?'active':''}" id="tab-day2" role="tab" tabindex="0" aria-selected="${view==='day2'}"><span class="d">Tuesday</span>Prompt Log</div>
   </div>`;
 }
 function wireDayTabs(){
   const a=$('#tab-day1'), b=$('#tab-day2');
   if(a) a.onclick=()=>{ view='day1'; render(); };
   if(b) b.onclick=()=>{ view='day2'; render(); };
+  keyActivate(a); keyActivate(b);
   $('#switch').onclick=()=>{ view='admin'; render(); };
 }
 
@@ -305,15 +307,16 @@ async function renderAdmin(){
   app.innerHTML='';
   const wrap=document.createElement('div'); wrap.className='wrap wide';
   wrap.innerHTML = header('Live submissions.') + `
-    <div class="tabbar">
-      <div class="tab ${adminTab==='teams'?'active':''}" id="at-teams">Teams (Mon)</div>
-      <div class="tab ${adminTab==='prompts'?'active':''}" id="at-prompts">Prompt logs (Tue)</div>
+    <div class="tabbar" role="tablist">
+      <div class="tab ${adminTab==='teams'?'active':''}" id="at-teams" role="tab" tabindex="0" aria-selected="${adminTab==='teams'}">Teams (Mon)</div>
+      <div class="tab ${adminTab==='prompts'?'active':''}" id="at-prompts" role="tab" tabindex="0" aria-selected="${adminTab==='prompts'}">Prompt logs (Tue)</div>
     </div>
     <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
   $('#at-teams').onclick=()=>{ adminTab='teams'; renderAdmin(); };
   $('#at-prompts').onclick=()=>{ adminTab='prompts'; renderAdmin(); };
+  keyActivate($('#at-teams')); keyActivate($('#at-prompts'));
   if(adminTab==='teams') await renderTeamsTab();
   else await renderPromptsTab();
 }

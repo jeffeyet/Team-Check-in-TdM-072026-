@@ -1,5 +1,6 @@
 // AI Leadership Intensive - team portal
 // Day 1: team check-in.  Day 2: prompt log (Google Doc link + revised idea).
+const crypto = require("crypto");
 const express = require("express");
 const Database = require("@replit/database");
 
@@ -13,7 +14,9 @@ const PASSCODE = process.env.PASSCODE || "roster2026";
 
 function checkCode(req) {
   const code = (req.query.code || (req.body && req.body.code) || "").toString();
-  return code === PASSCODE;
+  const given = crypto.createHash("sha256").update(code).digest();
+  const expected = crypto.createHash("sha256").update(PASSCODE).digest();
+  return crypto.timingSafeEqual(given, expected);
 }
 
 // ===================== DAY 1: TEAM CHECK-IN =====================
