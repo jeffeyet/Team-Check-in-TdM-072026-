@@ -93,11 +93,30 @@
   .empty{text-align:center;color:var(--muted);padding:48px 20px}
   .empty h2{font-family:'Space Grotesk',sans-serif;color:var(--ink);margin:0 0 6px}
   .foot{margin-top:22px;font-size:12px;color:var(--muted);text-align:center}
+  /* diagram builder */
+  .dtoolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  .dtoolbar .addbtn.active{border-color:var(--gold);color:var(--gold-deep);background:rgba(232,167,35,.08)}
+  .dhint{font-size:12px;color:var(--muted)}
+  .dcanvas{position:relative;border:1px solid var(--line);border-radius:12px;background:#fffdf8;height:340px;overflow:auto;touch-action:none}
+  .dcanvas-view{height:220px;margin-top:10px}
+  .dsvg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .dline{stroke:var(--ink-2);stroke-width:2}
+  .dline:hover{stroke:var(--danger)}
+  .dbox{position:absolute;width:140px;min-height:54px;background:#fff;border:1.5px solid var(--ink);border-radius:10px;padding:6px 10px 8px;box-shadow:var(--shadow)}
+  .dbox.readonly{cursor:default}
+  .dbox.connecting{border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,167,35,.25)}
+  .dbox-handle{height:12px;margin:-2px -6px 4px;cursor:grab;color:var(--line);font-size:10px;letter-spacing:2px;text-align:center;border-radius:6px 6px 0 0}
+  .dbox-handle:active{cursor:grabbing}
+  .dbox-lbl{font-size:13px;font-weight:600;color:var(--ink);outline:none;word-break:break-word;min-height:16px}
+  .dbox-lbl:empty:before{content:attr(data-ph);color:var(--muted);font-weight:400}
+  .dbox-rm{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:13px;line-height:1;cursor:pointer;padding:0}
+  .dbox-rm:hover{color:var(--danger);border-color:#e7cccc}
   @media (max-width:560px){
     .brand h1{font-size:21px}
     .mrow{grid-template-columns:1fr auto;gap:8px}
     .mrow input[type=url]{grid-column:1 / -1}
     .pmbox{grid-column:1 / 2}
+    .daytab{padding:8px 6px;font-size:11px}
   }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -109,12 +128,13 @@
 const MAX_MEMBERS = 6;
 const $ = (s, el=document) => el.querySelector(s);
 const app = document.getElementById('app');
-let view = 'day2';          // 'day1' | 'day2' | 'admin'  (defaults to today: Tuesday)
+let view = 'day2';          // 'day1' | 'day2' | 'day3' | 'admin'  (defaults to today: Tuesday)
 let unlocked = false;
 let adminCode = '';
-let adminTab = 'prompts';   // 'teams' | 'prompts'
+let adminTab = 'prompts';   // 'teams' | 'prompts' | 'diagrams'
 let lastTeams = [];
 let lastLogs = [];
+let lastDiagrams = [];
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -132,12 +152,14 @@ function dayTabs(){
   return `<div class="daytabs">
     <div class="daytab ${view==='day1'?'active':''}" id="tab-day1"><span class="d">Monday</span>Team Check-In</div>
     <div class="daytab ${view==='day2'?'active':''}" id="tab-day2"><span class="d">Tuesday</span>Prompt Log</div>
+    <div class="daytab ${view==='day3'?'active':''}" id="tab-day3"><span class="d">Wednesday</span>Project Diagram</div>
   </div>`;
 }
 function wireDayTabs(){
-  const a=$('#tab-day1'), b=$('#tab-day2');
+  const a=$('#tab-day1'), b=$('#tab-day2'), c=$('#tab-day3');
   if(a) a.onclick=()=>{ view='day1'; render(); };
   if(b) b.onclick=()=>{ view='day2'; render(); };
+  if(c) c.onclick=()=>{ view='day3'; render(); };
   $('#switch').onclick=()=>{ view='admin'; render(); };
 }
 
@@ -260,6 +282,197 @@ async function submitDay2(){
   }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Submit my prompt log'; }
 }
 
+/* ===================== DAY 3: PROJECT DIAGRAM ===================== */
+const DBOX_W = 140, DBOX_H = 54, DCANVAS_H = 340, MAX_DBOXES = 10, MAX_DARROWS = 20;
+let dBoxes = [], dArrows = [], dSeq = 0, dConnectMode = false, dConnectFirst = null;
+let dUidSeq = 0;
+
+function dClipPoint(cx, cy, tx, ty){
+  const dx=tx-cx, dy=ty-cy;
+  if(!dx && !dy) return {x:cx,y:cy};
+  const halfW=DBOX_W/2, halfH=DBOX_H/2;
+  const sx = dx!==0 ? halfW/Math.abs(dx) : Infinity;
+  const sy = dy!==0 ? halfH/Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return {x:cx+dx*s, y:cy+dy*s};
+}
+
+function dBuildSvgAndBoxes(container, boxes, arrows, opts){
+  opts = opts || {};
+  const uid = 'darrow'+(dUidSeq++);
+  container.innerHTML = '';
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class','dsvg');
+  svg.innerHTML = `<defs><marker id="${uid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--ink-2)"></path></marker></defs>`;
+  container.appendChild(svg);
+
+  function redrawArrows(){
+    svg.querySelectorAll('.dline').forEach(el=>el.remove());
+    arrows.forEach((a,i)=>{
+      const from=boxes.find(b=>b.id===a.from), to=boxes.find(b=>b.id===a.to);
+      if(!from || !to) return;
+      const c1={x:from.x+DBOX_W/2,y:from.y+DBOX_H/2}, c2={x:to.x+DBOX_W/2,y:to.y+DBOX_H/2};
+      const p1=dClipPoint(c1.x,c1.y,c2.x,c2.y), p2=dClipPoint(c2.x,c2.y,c1.x,c1.y);
+      const line=document.createElementNS(svgNS,'line');
+      line.setAttribute('class','dline');
+      line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+      line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+      line.setAttribute('marker-end',`url(#${uid})`);
+      if(opts.interactive){
+        line.style.cursor='pointer'; line.style.pointerEvents='auto';
+        line.addEventListener('click',()=>{ arrows.splice(i,1); redrawArrows(); });
+      }
+      svg.appendChild(line);
+    });
+  }
+
+  boxes.forEach(box=>{
+    const el=document.createElement('div');
+    el.className='dbox'+(opts.interactive?'':' readonly')+(box.id===opts.connecting?' connecting':'');
+    el.style.left=box.x+'px'; el.style.top=box.y+'px';
+    el.dataset.id=box.id;
+    el.innerHTML = (opts.interactive?`<div class="dbox-handle" title="Drag">&#8942;&#8942;&#8942;</div>`:'') +
+      `<div class="dbox-lbl" ${opts.interactive?'contenteditable="true"':''} data-ph="Label">${esc(box.label)}</div>` +
+      (opts.interactive?`<button type="button" class="dbox-rm" title="Remove">&times;</button>`:'');
+    container.appendChild(el);
+    if(!opts.interactive) return;
+
+    const lbl=el.querySelector('.dbox-lbl');
+    if(opts.connectMode) lbl.contentEditable='false';
+    lbl.addEventListener('blur',()=>{ const t=lbl.textContent.trim().slice(0,40); box.label=t; lbl.textContent=t; });
+    el.querySelector('.dbox-rm').onclick=()=>{ opts.onRemoveBox(box.id); };
+    el.querySelector('.dbox-handle').addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      const rect=container.getBoundingClientRect();
+      const startX=e.clientX, startY=e.clientY, origX=box.x, origY=box.y;
+      function move(ev){
+        const dx=ev.clientX-startX, dy=ev.clientY-startY;
+        box.x=Math.max(6, Math.min(rect.width-DBOX_W-6, origX+dx));
+        box.y=Math.max(12, Math.min(DCANVAS_H-DBOX_H-6, origY+dy));
+        el.style.left=box.x+'px'; el.style.top=box.y+'px';
+        redrawArrows();
+      }
+      function up(){ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); }
+      document.addEventListener('pointermove',move);
+      document.addEventListener('pointerup',up);
+    });
+    el.addEventListener('click', e=>{
+      if(!opts.connectMode) return;
+      if(e.target.classList.contains('dbox-rm')) return;
+      opts.onBoxClick(box.id);
+    });
+  });
+
+  redrawArrows();
+  return { redrawArrows };
+}
+
+async function renderDay3(){
+  app.className=''; app.innerHTML='';
+  const wrap=document.createElement('div'); wrap.className='wrap';
+  wrap.innerHTML = header('Sketch how your project fits together: boxes for parts, arrows for how they connect.') + dayTabs() + `
+    <div class="card">
+      <div class="field">
+        <label class="lab" for="d-team">Team name <span class="req">*</span></label>
+        <input type="text" id="d-team" list="dteamlist" placeholder="Your team from Monday">
+        <datalist id="dteamlist"></datalist>
+      </div>
+      <div class="field">
+        <label class="lab">Project diagram <span class="req">*</span><span class="hint">add a box for each part, then connect them with arrows</span></label>
+        <div class="dtoolbar">
+          <button type="button" class="addbtn" id="daddbox">+ Add box</button>
+          <button type="button" class="addbtn" id="daddarrow">+ Connect boxes</button>
+          <button type="button" class="addbtn" id="dclearbtn">Clear</button>
+          <span class="dhint" id="dhint"></span>
+        </div>
+        <div class="dcanvas" id="dcanvas"></div>
+      </div>
+      <button class="btn btn-primary" id="dsubmit">Save my diagram</button>
+      <div class="msg" id="dmsg"></div>
+    </div>
+    <div class="foot">Shared with the instructor for review.</div>`;
+  app.appendChild(wrap);
+  wireDayTabs();
+  try{ const r=await fetch('/api/teamnames'); const d=await r.json(); $('#dteamlist').innerHTML=(d.names||[]).map(n=>`<option value="${esc(n)}">`).join(''); }catch(e){}
+
+  const canvas=$('#dcanvas');
+  function updateHint(){
+    $('#dhint').textContent = dConnectMode ? 'Click one box, then another, to draw an arrow between them.' : (dBoxes.length===0 ? 'Start by adding a box for each part of your project.' : '');
+  }
+  function paint(){
+    dBuildSvgAndBoxes(canvas, dBoxes, dArrows, {
+      interactive:true, connectMode:dConnectMode, connecting:dConnectFirst,
+      onRemoveBox:(id)=>{
+        dBoxes=dBoxes.filter(b=>b.id!==id);
+        dArrows=dArrows.filter(a=>a.from!==id&&a.to!==id);
+        paint();
+      },
+      onBoxClick:(id)=>{
+        if(!dConnectFirst){ dConnectFirst=id; paint(); return; }
+        if(dConnectFirst===id){ dConnectFirst=null; paint(); return; }
+        const exists=dArrows.some(a=>a.from===dConnectFirst&&a.to===id);
+        if(!exists && dArrows.length<MAX_DARROWS) dArrows.push({from:dConnectFirst,to:id});
+        dConnectFirst=null; dConnectMode=false;
+        $('#daddarrow').classList.remove('active');
+        updateHint(); paint();
+      }
+    });
+  }
+  $('#daddbox').onclick=()=>{
+    if(dBoxes.length>=MAX_DBOXES) return;
+    const id='b'+(dSeq++);
+    const rect=canvas.getBoundingClientRect();
+    const cols=Math.max(1, Math.floor((rect.width||480)/170));
+    const col=dBoxes.length%cols, row=Math.floor(dBoxes.length/cols);
+    const x=Math.min(20+col*170, Math.max(6,(rect.width||480)-DBOX_W-6));
+    dBoxes.push({id,label:'',x,y:20+row*90});
+    dConnectMode=false; dConnectFirst=null; $('#daddarrow').classList.remove('active');
+    updateHint(); paint();
+    const lbl=canvas.querySelector(`.dbox[data-id="${id}"] .dbox-lbl`);
+    if(lbl) lbl.focus();
+  };
+  $('#daddarrow').onclick=()=>{
+    if(dBoxes.length<2) return;
+    dConnectMode=!dConnectMode; dConnectFirst=null;
+    $('#daddarrow').classList.toggle('active', dConnectMode);
+    updateHint(); paint();
+  };
+  $('#dclearbtn').onclick=()=>{
+    if(dBoxes.length===0 && dArrows.length===0) return;
+    if(!confirm('Clear the whole diagram?')) return;
+    dBoxes=[]; dArrows=[]; dConnectMode=false; dConnectFirst=null;
+    $('#daddarrow').classList.remove('active');
+    updateHint(); paint();
+  };
+  dConnectMode=false; dConnectFirst=null;
+  updateHint(); paint();
+  $('#dsubmit').onclick=submitDiagram;
+}
+
+function dSyncLabelsFromDom(){
+  document.querySelectorAll('#dcanvas .dbox').forEach(el=>{
+    const id=el.dataset.id, box=dBoxes.find(b=>b.id===id), lbl=el.querySelector('.dbox-lbl');
+    if(box && lbl) box.label = lbl.textContent.trim().slice(0,40);
+  });
+}
+async function submitDiagram(){
+  dSyncLabelsFromDom();
+  const msg=$('#dmsg'); msg.className='msg';
+  const teamName=$('#d-team').value.trim();
+  if(!teamName){ msg.classList.add('err'); msg.textContent='Please add your team name.'; return; }
+  if(dBoxes.length===0){ msg.classList.add('err'); msg.textContent='Add at least one box to your diagram.'; return; }
+  if(dBoxes.some(b=>!b.label.trim())){ msg.classList.add('err'); msg.textContent='Every box needs a label.'; return; }
+  const btn=$('#dsubmit'); btn.disabled=true; btn.textContent='Saving...';
+  try{
+    const r=await fetch('/api/diagram-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teamName,boxes:dBoxes,arrows:dArrows})});
+    if(!r.ok) throw new Error();
+    const savedBoxes=dBoxes.length, savedArrows=dArrows.length;
+    dBoxes=[]; dArrows=[]; dSeq=0;
+    confirmScreen(esc(teamName)+"'s diagram is saved.", savedBoxes+' box(es), '+savedArrows+' connection(s).', renderDay3, 'Edit another');
+  }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Save my diagram'; }
+}
+
 /* ===================== shared confirmation ===================== */
 function confirmScreen(title, sub, againFn, againLabel){
   app.innerHTML='';
@@ -308,14 +521,17 @@ async function renderAdmin(){
     <div class="tabbar">
       <div class="tab ${adminTab==='teams'?'active':''}" id="at-teams">Teams (Mon)</div>
       <div class="tab ${adminTab==='prompts'?'active':''}" id="at-prompts">Prompt logs (Tue)</div>
+      <div class="tab ${adminTab==='diagrams'?'active':''}" id="at-diagrams">Diagrams (Wed)</div>
     </div>
     <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
   $('#at-teams').onclick=()=>{ adminTab='teams'; renderAdmin(); };
   $('#at-prompts').onclick=()=>{ adminTab='prompts'; renderAdmin(); };
+  $('#at-diagrams').onclick=()=>{ adminTab='diagrams'; renderAdmin(); };
   if(adminTab==='teams') await renderTeamsTab();
-  else await renderPromptsTab();
+  else if(adminTab==='prompts') await renderPromptsTab();
+  else await renderDiagramsTab();
 }
 
 async function renderTeamsTab(){
@@ -374,10 +590,33 @@ async function renderPromptsTab(){
   $('#clear').onclick=async()=>{ if(!confirm('Delete every prompt log?')) return; await fetch('/api/prompt-clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:adminCode})}); renderAdmin(); };
 }
 
+async function renderDiagramsTab(){
+  try{ const r=await fetch('/api/diagram-roster?code='+encodeURIComponent(adminCode)); const d=await r.json(); lastDiagrams=d.diagrams||[]; }catch(e){ lastDiagrams=[]; }
+  const diagrams=lastDiagrams; const content=$('#content');
+  if(diagrams.length===0){ content.innerHTML=`<div class="empty"><h2>No diagrams yet</h2><p>Submissions will appear here as students save their project diagrams.</p><button class="btn btn-ghost btn-sm" id="refresh" style="margin-top:12px">Refresh</button></div>`; $('#refresh').onclick=renderAdmin; return; }
+  let html=`<div class="stats">
+      <div class="stat"><div class="n">${diagrams.length}</div><div class="l">Teams</div></div>
+    </div>
+    <div class="toolbar"><button class="btn btn-ghost btn-sm" id="refresh">&#8635; Refresh</button><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="clear" style="color:var(--danger);border-color:#e7cccc">Clear diagrams</button></div>`;
+  for(const dgm of diagrams){
+    html+=`<div class="team"><div class="team-head"><span class="team-tag mono">${esc(dgm.teamName)}</span><span class="team-count">${(dgm.boxes||[]).length} box(es), ${(dgm.arrows||[]).length} connection(s)</span></div>
+      <div class="dcanvas dcanvas-view" id="dview-${esc(dgm.key)}"></div></div>`;
+  }
+  content.innerHTML=html;
+  for(const dgm of diagrams){
+    const el=document.getElementById('dview-'+dgm.key);
+    if(el) dBuildSvgAndBoxes(el, dgm.boxes||[], dgm.arrows||[], {interactive:false});
+  }
+  $('#refresh').onclick=renderAdmin;
+  $('#clear').onclick=async()=>{ if(!confirm('Delete every diagram?')) return; await fetch('/api/diagram-clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:adminCode})}); renderAdmin(); };
+}
+
 /* ===================== router ===================== */
 function render(){
   if(view==='admin'){ if(unlocked) renderAdmin(); else renderGate(); }
   else if(view==='day1') renderDay1();
+  else if(view==='day3') renderDay3();
   else renderDay2();
 }
 render();
