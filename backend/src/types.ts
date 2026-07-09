@@ -1,6 +1,11 @@
+// CANONICAL data contract (ADR-0007). These are the shapes stored in the KV and
+// sent over the API. `frontend/src/types.ts` MIRRORS this file: its domain types
+// must match field-for-field, and may only ADD fields marked as client-only
+// there. Keep the two in sync — nothing automated enforces it.
+
 export interface Member {
   name: string;
-  linkedin: string;
+  linkedin: string; // always an http(s) URL or "" (sanitized on write, RNF-012)
   isPM: boolean;
 }
 

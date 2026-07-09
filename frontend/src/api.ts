@@ -272,3 +272,18 @@ export async function copyText(text: string): Promise<boolean> {
 export function shareLink(id: string): string {
   return window.location.origin + "/?grupo=" + encodeURIComponent(id);
 }
+
+// True only for absolute http(s) URLs. Mirrors the server check (RNF-012): used
+// to validate the Day-2 Doc link before submit and to guard <a href> rendering
+// on the admin dashboard against stored non-http(s) links (defense in depth).
+export function isHttpUrl(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const s = value.trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}

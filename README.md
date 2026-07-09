@@ -46,8 +46,8 @@ backend/            Express + TypeScript API (see backend/README.md)
   src/config.ts       PASSCODE (fail-closed in prod), PORT
   src/db.ts           @replit/database wrapper (get/set/list/del)
   src/auth.ts         requirePasscode / requirePasscodeText (X-Passcode, timing-safe)
-  src/types.ts        Shared types (Team, PromptLog, Cohort)
-  src/lib/            csv.ts, respond.ts helpers
+  src/types.ts        Canonical data contract (Member, Team, PromptLog, Cohort; mirrored by frontend)
+  src/lib/            csv.ts, validate.ts (http(s) URLs), security.ts (headers + rate limit)
   src/services/       cohorts.ts, teams.ts, prompts.ts (storage + business logic)
   src/routes/         student.ts (/api/c), admin.ts (/api/admin)
 frontend/           React + TypeScript + Vite SPA (see frontend/README.md)
@@ -149,7 +149,7 @@ Request/response bodies are JSON, except the two `*.csv` exports and
 | GET    | `/api/c/:cohort`                  | Resolve a group by id. `404 "Group not found."` if it is missing or archived; otherwise `{cohort:{id,label}}` |
 | GET    | `/api/c/:cohort/teamnames`        | Unique, sorted team names for **this** cohort (powers Day 2 autocomplete). Never 401; returns `{names:[]}` on any error |
 | POST   | `/api/c/:cohort/submit`           | Day 1 check-in `{teamName, members[], idea}`. `400` on missing fields, `404` if the group is missing/archived |
-| POST   | `/api/c/:cohort/prompt-submit`    | Day 2 log `{teamName, idea, docUrl}`. `400` on missing fields, `404` if the group is missing/archived |
+| POST   | `/api/c/:cohort/prompt-submit`    | Day 2 log `{teamName, idea, docUrl}`. `400` on missing fields or a non-http(s) `docUrl`, `404` if the group is missing/archived |
 
 ### Instructor routes (passcode-gated) — mounted at `/api/admin`
 
@@ -170,6 +170,12 @@ Request/response bodies are JSON, except the two `*.csv` exports and
 Admin auth failures return `401 "Bad passcode."` (JSON routes) or `Unauthorized`
 (CSV/text routes). If the passcode is not configured in production, admin routes
 return `500 "Server passcode not configured."` instead.
+
+Every response carries security headers + a CSP, the JSON body is capped at
+`100kb`, user-supplied URLs are restricted to http(s), and CSV exports are guarded
+against spreadsheet formula injection. Public POSTs and `/api/admin` are
+rate-limited per IP (`429` with `Retry-After`). All of this is dependency-free —
+see [CC-011](docs/cambios/CC-011-endurecimiento-seguridad-auditoria.md).
 
 ## Data safety
 

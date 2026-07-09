@@ -45,7 +45,7 @@ test de handlers reales sobre un KV en memoria (33/33); ver
 
 | Carpeta / archivo | Responsabilidad |
 |---|---|
-| `backend/src/index.ts` | Arranque de Express; monta `/api/c` (alumno) y `/api/admin` (instructor); sirve `frontend/dist` + fallback SPA |
+| `backend/src/index.ts` | Arranque de Express; cabeceras de seguridad + límite JSON, `trust proxy`, monta `/api/c` (alumno) y `/api/admin` (instructor, con rate limit); sirve `frontend/dist` + fallback SPA; manejador de error final |
 | `backend/src/config.ts` | Configuración (`PASSCODE`, `PORT`) y advertencia de passcode al arranque (`warnPasscodeAtStartup`) |
 | `backend/src/db.ts` | Wrapper de `@replit/database` (Replit KV): `get`, `set`, `list(prefix)`, `del` |
 | `backend/src/auth.ts` | `checkCode` timing-safe (SHA-256), `requirePasscode`/`requirePasscodeText`, fail-closed en producción |
@@ -54,11 +54,11 @@ test de handlers reales sobre un KV en memoria (33/33); ver
 | `backend/src/services/cohorts.ts` | Índice de cohortes, prefijos de llave, crear/actualizar/archivar, contar, borrar envío, migrar legado, respaldo |
 | `backend/src/services/teams.ts` | Lectura/escritura de equipos por prefijo de cohorte y dedupe por cohorte |
 | `backend/src/services/prompts.ts` | Lectura/escritura de bitácoras de prompts por prefijo de cohorte |
-| `backend/src/lib/{csv,respond}.ts` | Helpers de CSV y de respuesta JSON |
+| `backend/src/lib/{csv,validate,security}.ts` | Helpers: CSV (con anti-inyección de fórmulas), validación de URL `http(s)`, y seguridad (cabeceras/CSP + rate limiter, sin dependencias) |
 | `frontend/src/App.tsx` | Router por estado; lee `?grupo=<id>` y valida la cohorte antes de las vistas de alumno |
 | `frontend/src/views/{Day1,Day2,Admin}.tsx` | Las vistas de alumno (Día 1/Día 2) y la de instructor (gestión de cohortes + detalle) |
 | `frontend/src/api.ts` | Cliente `fetch` tipado; centraliza el header `X-Passcode` y las descargas por blob |
-| `frontend/src/types.ts` | Tipos compartidos, incluido `Cohort` |
+| `frontend/src/types.ts` | Espejo de los tipos de `backend/src/types.ts` (contrato canónico, ADR-0007) + tipos de vista |
 | `frontend/vite.config.ts` | Build; en dev, proxy `/api` → `:3000` |
 | `package.json` (raíz) | Orquestador: `install:all`, `build`, `start`, `dev:*`, `typecheck` |
 
@@ -70,8 +70,8 @@ separada (un grupo / edición del curso); ver `backend/src/types.ts:29-36`.
 | Llave | Valor | Escrita por |
 |---|---|---|
 | `cohorts` | JSON array de `Cohort {id, label, createdAt, archived}` — el índice de cohortes | `backend/src/services/cohorts.ts` (`createCohort`, `updateCohort`, `archiveCohort`) |
-| `cohort:<id>:team:<ts>_<rand>` | `{teamName ≤120, idea ≤240, members[≤6]{name ≤120, linkedin ≤300, isPM}, ts}` | `POST /api/c/:cohort/submit` → `saveTeam` |
-| `cohort:<id>:prompt:<ts>_<rand>` | `{teamName ≤120, idea ≤240, docUrl ≤500, ts}` | `POST /api/c/:cohort/prompt-submit` → `savePrompt` |
+| `cohort:<id>:team:<ts>_<uuid>` | `{teamName ≤120, idea ≤240, members[≤6]{name ≤120, linkedin http(s) o "" ≤300, isPM}, ts}` | `POST /api/c/:cohort/submit` → `saveTeam` |
+| `cohort:<id>:prompt:<ts>_<uuid>` | `{teamName ≤120, idea ≤240, docUrl http(s) ≤500, ts}` | `POST /api/c/:cohort/prompt-submit` → `savePrompt` |
 
 Particularidades que conviene conocer:
 
@@ -155,6 +155,12 @@ Se **eliminaron** las rutas globales previas (`routes/teams.ts`,
 - **Descargas sin passcode en la URL.** CSV y `backup.json` se bajan por
   `fetch` + blob desde el front, con el header de passcode; no por navegación
   con `?code=` (`frontend/src/api.ts:193-233`).
+- **Endurecimiento de auditoría (CC-011), sin dependencias nuevas.** URLs de
+  usuario solo `http(s)` (cierra XSS por `href`, RNF-012), anti-inyección de
+  fórmulas en CSV (RNF-013), cabeceras de seguridad + CSP + límite de cuerpo
+  (RNF-014), rate limiting por IP en POST públicos y `/api/admin` (RNF-015, en
+  memoria) y un manejador de error final que no filtra el stack. Ver
+  `backend/src/lib/{validate,security,csv}.ts` e `index.ts`.
 
 ## Decisiones que ya se cerraron (antes "abiertas")
 

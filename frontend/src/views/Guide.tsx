@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { View, DayId, Cohort } from "../types";
 import { Header, DayTabs } from "../ui";
 import { getDay } from "../content/days";
+import { copyText } from "../api";
 
 // Generic renderer for read-only "guide" days (ADR-0005). It looks up the day
 // content by `view` and paints intro, concept cards, an inline diagram, the
@@ -34,15 +35,14 @@ export default function Guide({
     );
   }
 
-  function copyMessage() {
-    const msg = guide!.kit.copyMessage;
-    navigator.clipboard?.writeText(msg).then(
-      () => {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1800);
-      },
-      () => setCopied(false)
-    );
+  async function copyMessage() {
+    // Use the shared helper (clipboard API + execCommand fallback) so the copy
+    // works in insecure contexts / older browsers too (CC-012).
+    const ok = await copyText(guide!.kit.copyMessage);
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    }
   }
 
   return (

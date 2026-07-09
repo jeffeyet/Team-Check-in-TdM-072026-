@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import * as db from "../db";
 import { Team, TeamRecord } from "../types";
 import { teamPrefix } from "./cohorts";
@@ -25,7 +26,8 @@ export function dedupeTeams(raw: TeamRecord[]): TeamRecord[] {
 }
 
 export async function saveTeam(cohortId: string, clean: Team): Promise<void> {
-  const key =
-    teamPrefix(cohortId) + clean.ts + "_" + Math.random().toString(36).slice(2, 7);
+  // <ts>_<uuid>: the ts prefix keeps keys sortable by submission time; the UUID
+  // suffix removes the same-millisecond collision the old 5-char random had.
+  const key = teamPrefix(cohortId) + clean.ts + "_" + crypto.randomUUID();
   await db.set(key, clean);
 }

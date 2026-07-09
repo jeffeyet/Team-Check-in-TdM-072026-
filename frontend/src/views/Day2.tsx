@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { View, DayId, Cohort } from "../types";
 import { Header, DayTabs, ConfirmScreen } from "../ui";
-import { getTeamNames, submitPrompt } from "../api";
+import { getTeamNames, submitPrompt, isHttpUrl } from "../api";
 
 export default function Day2({
   view,
@@ -38,6 +38,10 @@ export default function Day2({
     }
     if (!du) {
       setMsg("Paste your Google Doc link.");
+      return;
+    }
+    if (!isHttpUrl(du)) {
+      setMsg("Enter a valid http(s) link (starting with https://).");
       return;
     }
     if (!id) {

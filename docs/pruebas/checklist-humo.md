@@ -37,6 +37,12 @@ Antes de empezar:
 | 14 | Alumno: abrir el enlace `/?grupo=<id>` del grupo archivado | Pantalla de código de grupo ("no encontrado"); no puede enviar |
 | 15 | Instructor: ingresar un passcode **incorrecto** | "That passcode did not match." (el servidor responde 401) |
 | 16 | Alumno: abrir la app **sin** `?grupo=` (o con un id inexistente) | Pantalla para ingresar el código del grupo; no hay vista de envío hasta resolver una cohorte válida |
+| 17 | Alumno — Día 2: pegar un link que **no** sea `http(s)` (p. ej. `javascript:alert(1)` o `ftp://x`) y enviar; luego con `https://…` | Sin `http(s)` → error "Enter a valid http(s) link…" y no se envía; con `https://…` → confirmación (RNF-012) |
+| 18 | Instructor: registrar un equipo cuyo nombre empiece con `=` (p. ej. `=1+1`), exportar **teams.csv** y abrirlo en Excel/Sheets | La celda se muestra como **texto** (prefijada con `'`), no se evalúa como fórmula (RNF-013) |
+| 19 | Técnico (corre en cualquier entorno): `curl -I http://localhost:3000/`; y enviar >100 POST/min a `/api/c/<id>/submit` desde una IP | La respuesta trae `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` (RNF-014); al exceder el umbral, los POST devuelven **429** con `Retry-After` (RNF-015) |
+
+> Los pasos 17–18 escriben/exportan datos (requieren Replit o el `devStore` local).
+> El paso 19 no toca la base de datos y corre en cualquier entorno.
 
 Verificación estática asociada: `npm run typecheck` y `npm run build` deben pasar
 sin errores antes de correr esta checklist.

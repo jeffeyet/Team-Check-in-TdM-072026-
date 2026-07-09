@@ -13,13 +13,14 @@ team's Spanish planning docs are in [`../docs`](../docs/README.md).
 
 | Path                    | Purpose |
 |-------------------------|---------|
-| `index.ts`              | Startup: mounts `student` at `/api/c` and `admin` at `/api/admin`, serves `frontend/dist`, SPA fallback |
+| `index.ts`              | Startup: security headers + JSON body limit, `trust proxy`, mounts `student` at `/api/c` and `admin` at `/api/admin` (rate-limited), serves `frontend/dist`, SPA fallback, final error handler |
 | `config.ts`             | `PASSCODE` (fail-closed posture), `PORT`; `warnPasscodeAtStartup` |
 | `db.ts`                 | Wrapper around `@replit/database` — `get` / `set` / `list(prefix)` / `del` |
 | `auth.ts`               | `requirePasscode` (JSON) / `requirePasscodeText` (CSV/text); `X-Passcode` header or `{code}` body, timing-safe SHA-256 |
-| `types.ts`              | Shared types: `Team`, `PromptLog`, `Cohort` |
-| `lib/csv.ts`            | CSV line serialization (quoted fields) |
-| `lib/respond.ts`        | Shared error-response helpers |
+| `types.ts`              | Canonical data contract: `Member`, `Team`, `PromptLog`, `Cohort` (mirrored by `frontend/src/types.ts`, ADR-0007) |
+| `lib/csv.ts`            | CSV line serialization (quoted fields + formula-injection guard) |
+| `lib/validate.ts`       | `isHttpUrl` / `sanitizeHttpUrl` — restrict user URLs to http(s) |
+| `lib/security.ts`       | `securityHeaders` (+ CSP) and a per-IP `rateLimit` — dependency-free |
 | `services/cohorts.ts`   | Cohort index, key-prefix helpers, slugify, create/update/archive, counts, single-submission delete, legacy migration, backup |
 | `services/teams.ts`     | Day 1 storage + per-cohort load and dedupe |
 | `services/prompts.ts`   | Day 2 storage + per-cohort load |
@@ -35,7 +36,7 @@ team's Spanish planning docs are in [`../docs`](../docs/README.md).
 | GET    | `/:cohort`                     | Resolve a group; `404 "Group not found."` if missing/archived, else `{cohort:{id,label}}` |
 | GET    | `/:cohort/teamnames`           | Unique sorted team names for this cohort; never 401, `{names:[]}` on error |
 | POST   | `/:cohort/submit`              | Day 1 `{teamName, members[], idea}`; `400` on missing fields, `404` if group missing/archived, `500 "Save failed."` on KV error |
-| POST   | `/:cohort/prompt-submit`       | Day 2 `{teamName, idea, docUrl}`; same error posture |
+| POST   | `/:cohort/prompt-submit`       | Day 2 `{teamName, idea, docUrl}`; same error posture, plus `400` if `docUrl` is not an http(s) URL |
 
 ### Instructor — mounted at `/api/admin` (every route passcode-gated)
 
@@ -56,6 +57,14 @@ team's Spanish planning docs are in [`../docs`](../docs/README.md).
 Auth failures: `401 "Bad passcode."` (JSON) or `Unauthorized` (CSV/text). KV
 failures are caught per handler and return `500` (`Load/Save/Export/... failed.`)
 rather than crashing the process.
+
+**Security posture (CC-011, no new deps):** every response carries security
+headers + a CSP; the JSON body is capped at `100kb`; user URLs are restricted to
+http(s) (LinkedIn sanitized to `""`, bad `docUrl` → `400`); CSV fields are guarded
+against formula injection. Public POSTs and all of `/api/admin` are rate-limited
+per IP (**`429`** with `Retry-After`); the limiter is in-memory (single process).
+A final error handler turns malformed/oversized bodies into `400`/`413` and any
+other unhandled error into a `500` without leaking a stack trace.
 
 ## Commands
 

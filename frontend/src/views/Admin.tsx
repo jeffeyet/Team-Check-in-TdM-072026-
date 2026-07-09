@@ -15,6 +15,7 @@ import {
   downloadBackup,
   copyText,
   shareLink,
+  isHttpUrl,
 } from "../api";
 
 function keyActivate(fn: () => void) {
@@ -401,8 +402,8 @@ function TeamsTab({
                 <li key={mi}>
                   <span>{m.name}</span>
                   {m.isPM ? <span className="pm-badge">First PM</span> : null}
-                  {m.linkedin ? (
-                    <a href={m.linkedin} target="_blank" rel="noopener">
+                  {isHttpUrl(m.linkedin) ? (
+                    <a href={m.linkedin} target="_blank" rel="noopener noreferrer">
                       LinkedIn ↗
                     </a>
                   ) : (
@@ -509,12 +510,12 @@ function PromptsTab({
                   >
                     {l.idea || ""}
                   </span>
-                  {l.docUrl ? (
+                  {isHttpUrl(l.docUrl) ? (
                     <a
                       className="doclink"
                       href={l.docUrl}
                       target="_blank"
-                      rel="noopener"
+                      rel="noopener noreferrer"
                     >
                       Open prompts ↗
                     </a>

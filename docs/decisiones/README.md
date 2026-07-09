@@ -16,6 +16,7 @@ edita: se reemplaza con un ADR nuevo, y el anterior se marca como
 | [0004](0004-aislamiento-por-cohorte.md) | Aislamiento por cohorte sobre Replit KV | aceptada |
 | [0005](0005-guias-como-datos.md) | Guías (contenido read-only) como datos | aceptada |
 | [0006](0006-materiales-estaticos-sin-upload.md) | Materiales del profesor: archivos estáticos + manifest, sin subida ni IA en runtime | propuesta |
+| [0007](0007-tipos-canonicos-espejo-cliente.md) | Tipos: backend canónico + espejo documentado en el cliente | aceptada |
 
 ## Cuándo escribir un ADR
 

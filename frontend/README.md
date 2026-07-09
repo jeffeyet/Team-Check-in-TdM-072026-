@@ -20,7 +20,7 @@ team's Spanish planning docs are in [`../docs`](../docs/README.md).
 | `views/Admin.tsx` | Instructor dashboard: passcode gate, create/list/archive cohorts, per-cohort share link (copy), cohort detail with Teams/Prompts tabs, CSV export, single-submission delete, legacy import, JSON backup |
 | `api.ts`          | Typed fetch client for `/api/c` (student) and `/api/admin` (instructor) |
 | `ui.tsx`          | Shared UI: Header, DayTabs, GroupGate, ConfirmScreen, LoadingScreen |
-| `types.ts`        | Shared view/data types (`View`, `AdminTab`, `Team`, `PromptLog`, `Cohort`) |
+| `types.ts`        | View types (`View`, `AdminTab`) + data types mirroring `backend/src/types.ts` (canonical contract, ADR-0007) |
 | `styles.css`      | Styles |
 | `../index.html`   | Vite HTML entry |
 | `../vite.config.ts` | Vite config; dev server on :5173, proxies `/api` → `:3000` |

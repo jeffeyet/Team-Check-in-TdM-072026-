@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import * as db from "../db";
 import { PromptLog, PromptLogRecord } from "../types";
 import { promptPrefix } from "./cohorts";
@@ -19,7 +20,7 @@ export async function loadPrompts(cohortId: string): Promise<PromptLogRecord[]> 
 }
 
 export async function savePrompt(cohortId: string, clean: PromptLog): Promise<void> {
-  const key =
-    promptPrefix(cohortId) + clean.ts + "_" + Math.random().toString(36).slice(2, 7);
+  // <ts>_<uuid>: sortable ts prefix + collision-free UUID suffix (see saveTeam).
+  const key = promptPrefix(cohortId) + clean.ts + "_" + crypto.randomUUID();
   await db.set(key, clean);
 }

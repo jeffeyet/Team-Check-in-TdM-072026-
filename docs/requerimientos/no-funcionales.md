@@ -17,6 +17,13 @@ ajustaron a las líneas actuales del código reorganizado. Convenciones:
 el Día 3 (guía) y los materiales del profesor formalizan una cualidad que ya era
 decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
 
+**Actualización 2026-07-09 ([CC-011](../cambios/CC-011-endurecimiento-seguridad-auditoria.md)):**
+una auditoría del código añadió cuatro requisitos de seguridad —**RNF-012 …
+RNF-015**—, todos implementados **sin dependencias nuevas** (RNF-001 intacto). Se
+matizan RNF-003 (el escape JSX no cubre `href`) y RNF-004 (el límite de cuerpo
+pasa a ser explícito), y el límite conocido "no hay rate limiting" pasa a
+resuelto parcial (en memoria, un proceso).
+
 ---
 
 ## RNF-001 · Simplicidad del stack
@@ -72,6 +79,10 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
   cambió el mecanismo. Antes el escape era manual, con la función `esc()` del
   frontend de un solo archivo; ahora lo garantiza el escape por defecto de
   React (JSX). El comportamiento observable es el mismo.
+- **Límite (CC-011):** el escape por JSX cubre el **texto**, no el atributo
+  `href` de un enlace: React no sanea `href`, así que un `docUrl`/`linkedin`
+  malicioso (`javascript:…`) sería un vector de XSS. Esa superficie la cubre
+  **RNF-012** (solo se aceptan/renderizan URLs `http(s)`), no este RNF-003.
 
 ## RNF-004 · Límites de tamaño en el servidor
 
@@ -80,11 +91,14 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
 - **Criterios de aceptación:** nombre de equipo ≤120, idea ≤240, nombre de
   miembro ≤120, LinkedIn ≤300, enlace de documento ≤500 caracteres; máximo
   6 miembros por equipo. Además, la etiqueta de cohorte se trunca a 120.
-- **Estado:** implementado.
-- **Fuente:** `backend/src/routes/student.ts:51-59` (equipo/idea/miembro/LinkedIn
-  y `.slice(0, 6)` de miembros en el Día 1), `:84-86` (equipo/idea/enlace del
+- **Estado:** implementado. Reforzado por CC-011: el límite del **cuerpo** de la
+  petición pasa a ser **explícito** (`express.json({ limit: "100kb" })`), no solo
+  el default implícito de `express.json()`; ver RNF-014.
+- **Fuente:** `backend/src/routes/student.ts` (equipo/idea/miembro/LinkedIn
+  y `.slice(0, 6)` de miembros en el Día 1; equipo/idea/enlace del
   Día 2); `backend/src/services/cohorts.ts:81` (`createCohort`) y `:116`
-  (`updateCohort`) (etiqueta de cohorte a 120).
+  (`updateCohort`) (etiqueta de cohorte a 120); `backend/src/index.ts:21`
+  (límite explícito del cuerpo JSON).
 
 ## RNF-005 · Operable con teclado (parcial)
 
@@ -217,14 +231,91 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
 
 ---
 
+## RNF-012 · URLs de usuario restringidas a http(s)
+
+- **Descripción:** los enlaces provistos por usuarios (LinkedIn del Día 1, Doc
+  del Día 2) solo se aceptan y se renderizan si son URLs absolutas `http://` o
+  `https://`. Cierra el vector de XSS almacenado de un `href` `javascript:`/`data:`
+  que correría en la sesión del instructor al hacer clic (React no sanea `href`;
+  complementa RNF-003).
+- **Criterios de aceptación:**
+  - El servidor descarta un `linkedin` no `http(s)` a `""` y **rechaza** con 400
+    un `docUrl` no `http(s)` en `POST /api/c/:cohort/prompt-submit`.
+  - El frontend valida el link del Día 2 antes de enviar y **no** renderiza como
+    enlace (`<a href>`) ningún `linkedin`/`docUrl` que no sea `http(s)` (defensa
+    en profundidad ante datos previos ya almacenados).
+- **Estado:** implementado ([CC-011](../cambios/CC-011-endurecimiento-seguridad-auditoria.md)).
+- **Fuente:** `backend/src/lib/validate.ts:9-24` (`isHttpUrl`/`sanitizeHttpUrl`);
+  `backend/src/routes/student.ts:70` (LinkedIn saneado) y `:96-100` (docUrl 400 si
+  inválido); `frontend/src/api.ts:279-289` (`isHttpUrl`),
+  `frontend/src/views/Day2.tsx:43-46` (validación previa),
+  `frontend/src/views/Admin.tsx:405,513` (guardas de `href`).
+
+## RNF-013 · Neutralización de inyección de fórmulas en CSV
+
+- **Descripción:** los CSV exportados no permiten inyección de fórmulas: un campo
+  controlado por el alumno que empiece con `= + - @` (o tab/CR) no se ejecuta como
+  fórmula al abrir el archivo en Excel/Google Sheets.
+- **Criterios de aceptación:** un nombre de equipo como `=1+1` aparece en el CSV
+  prefijado con una comilla simple (`"'=1+1"`), que el software de hoja de cálculo
+  interpreta como texto. El entrecomillado con comillas dobladas (contra el corte
+  por delimitador) se conserva.
+- **Estado:** implementado ([CC-011](../cambios/CC-011-endurecimiento-seguridad-auditoria.md)).
+- **Fuente:** `backend/src/lib/csv.ts:9-17` (`neutralizeFormula` aplicado dentro
+  de `csvLine`); consumido por los exports en `backend/src/routes/admin.ts`.
+
+## RNF-014 · Cabeceras de seguridad HTTP y límite de cuerpo explícito
+
+- **Descripción:** toda respuesta lleva cabeceras de seguridad y el parser JSON
+  tiene un tope de tamaño explícito, sin añadir dependencias (RNF-001).
+- **Criterios de aceptación:**
+  - Se fijan `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+    `Referrer-Policy: no-referrer` y una `Content-Security-Policy` que solo
+    permite el mismo origen más Google Fonts (`fonts.googleapis.com` /
+    `fonts.gstatic.com`) y estilos inline (`style={{…}}`). Se desactiva
+    `X-Powered-By`.
+  - `express.json({ limit: "100kb" })`; un cuerpo mayor devuelve 413 controlado.
+- **Estado:** implementado ([CC-011](../cambios/CC-011-endurecimiento-seguridad-auditoria.md)).
+- **Fuente:** `backend/src/lib/security.ts:14-38` (`securityHeaders` + CSP);
+  `backend/src/index.ts:17` (`x-powered-by` off), `:19` (uso del middleware),
+  `:21` (límite del cuerpo).
+
+## RNF-015 · Rate limiting básico (en memoria, por IP)
+
+- **Descripción:** los POST públicos y las rutas de instructor están limitados por
+  frecuencia para contener inundación de envíos y fuerza bruta del passcode, con un
+  limitador propio (sin dependencias).
+- **Criterios de aceptación:**
+  - Ventana fija por IP: al exceder el máximo se devuelve **429** con
+    `Retry-After`. Aplica a `POST /submit` y `POST /prompt-submit` (bucket
+    compartido) y a todo `/api/admin`.
+  - El umbral de los POST públicos es **deliberadamente alto** (100/min): un salón
+    de clases suele compartir una IP pública (NAT), así que no debe bloquear a una
+    cohorte enviando con normalidad, solo a un flujo automatizado.
+- **Estado:** implementado ([CC-011](../cambios/CC-011-endurecimiento-seguridad-auditoria.md)).
+- **Límite:** es **en memoria** (como `withIndexLock`, CC-008): no cubre múltiples
+  instancias; a la escala del curso (un proceso Replit) es efectivo. Requiere
+  `app.set("trust proxy", 1)` para que `req.ip` sea el cliente real tras el proxy
+  de Replit.
+- **Fuente:** `backend/src/lib/security.ts:49-79` (`rateLimit`);
+  `backend/src/index.ts:16` (`trust proxy`), `:26,28` (limitador de admin);
+  `backend/src/routes/student.ts:16` (limitador público), `:48,84` (aplicado a los
+  POST).
+
+---
+
 ## Límites conocidos (observaciones; no son requisitos)
 
 Comportamientos reales de la app hoy que la línea base **no** garantiza como
 cualidades (registrados aquí como hechos, no como trabajo planeado; su
 priorización futura se decide en [F1 del roadmap](../roadmap.md)):
 
-- No hay rate limiting en ningún endpoint (envíos públicos ni intentos de
-  passcode).
+- **Rate limiting: resuelto parcial (CC-011, RNF-015).** Ya hay un limitador en
+  memoria en los POST públicos y en `/api/admin`. Residuales: (a) es **por
+  proceso**, no cubre múltiples instancias; (b) el umbral público es alto a
+  propósito (un salón comparte IP por NAT), así que frena scripts pero no un abuso
+  de baja frecuencia; (c) no distingue intentos fallidos de passcode de tráfico
+  legítimo (limita por volumen, no por fallos).
 - Los re-envíos del Día 1 dejan llaves antiguas en el KV que ya no se muestran
   (solo la más reciente por nombre **dentro de la cohorte**), pero siguen
   ocupando espacio. El instructor puede borrarlas una a una (RF-014).

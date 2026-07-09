@@ -46,9 +46,20 @@ export interface DayDef {
   guide?: GuideContent; // present when kind === "guide"
 }
 
+// --- Data types: MIRROR of backend/src/types.ts (the canonical contract) ---
+// ADR-0007: the backend owns the data contract; this file must match it
+// field-for-field on the shared properties. The ONLY allowed differences are
+// client-only additions, marked "client-only" below, that reflect the API
+// response shape (fields the server adds) or UI convenience:
+//   - Team/PromptLog `key?`     — present on admin roster/prompt responses
+//   - Team/PromptLog `ts?`      — set by the server; absent in submit payloads
+//   - Cohort `createdAt?/archived?` — full on the admin index, partial elsewhere
+//   - Cohort `teamCount?/promptCount?` — only on GET /api/admin/cohorts
+// Keep this in sync by hand; nothing automated enforces it.
+
 export interface Member {
   name: string;
-  linkedin?: string;
+  linkedin: string; // http(s) URL or "" (server sanitizes on write, RNF-012)
   isPM: boolean;
 }
 
@@ -56,9 +67,9 @@ export interface Team {
   teamName: string;
   idea: string;
   members: Member[];
-  ts?: number;
-  // Storage key ("cohort:<id>:team:<ts>_<rand>"), present on admin roster
-  // responses so a single submission can be deleted individually.
+  ts?: number; // client-only: server-set timestamp, absent in submit payloads
+  // client-only: storage key ("cohort:<id>:team:<ts>_<uuid>"), present on admin
+  // roster responses so a single submission can be deleted individually.
   key?: string;
 }
 
@@ -66,9 +77,9 @@ export interface PromptLog {
   teamName: string;
   idea: string;
   docUrl: string;
-  ts?: number;
-  // Storage key ("cohort:<id>:prompt:<ts>_<rand>"), present on admin
-  // prompt responses so a single submission can be deleted individually.
+  ts?: number; // client-only: server-set timestamp
+  // client-only: storage key ("cohort:<id>:prompt:<ts>_<uuid>"), present on
+  // admin prompt responses so a single submission can be deleted individually.
   key?: string;
 }
 
@@ -77,9 +88,9 @@ export interface PromptLog {
 export interface Cohort {
   id: string;
   label: string;
-  createdAt?: number;
-  archived?: boolean;
-  // Present on the admin cohort index (GET /api/admin/cohorts).
+  createdAt?: number; // client-only: partial on student responses ({id,label})
+  archived?: boolean; // client-only: partial on student responses
+  // client-only: present on the admin cohort index (GET /api/admin/cohorts).
   teamCount?: number;
   promptCount?: number;
 }

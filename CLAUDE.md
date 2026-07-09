@@ -87,6 +87,16 @@ parity with the original. The old single-file app lives only in git history
    accounts.
 4. `.gitignore` ignores `*.csv` so exported rosters (PII) are never committed to
    the public fork.
+5. **Audit hardening (CC-011), zero new deps.** User URLs must be `http(s)` —
+   the server sanitizes LinkedIn to `""` and 400s a bad `docUrl`
+   (`backend/src/lib/validate.ts`), and the front guards every `<a href>`
+   (`frontend/src/api.ts` `isHttpUrl`); this covers the one XSS surface JSX
+   escaping does NOT (`href`, RNF-012). CSV fields starting with `= + - @` are
+   prefixed with `'` against formula injection (`backend/src/lib/csv.ts`).
+   Security headers + CSP and a hand-rolled per-IP rate limiter live in
+   `backend/src/lib/security.ts` (wired in `index.ts`); the limiter is in-memory
+   (same multi-instance caveat as `withIndexLock`) and its public threshold is
+   deliberately high because a classroom shares one NAT IP.
 
 ## Data safety (no destructive clear-all)
 
@@ -129,12 +139,16 @@ speculatively; it would only be revisited for a genuinely creative use.
 - Durable technical decisions get an ADR in `docs/decisiones/`. Current
   accepted direction is **ADR-0003** (modern TS+Express / React+Vite stack at
   the repo root, Replit KV kept), which supersedes 0002 and 0001.
-- Change-control baseline: **CC-001** (documentation restructure) and
-  **CC-002** (modern stack) are implemented. As of `registro.md`, the CCs and
-  any ADR for the **cohort-isolation and security-hardening** work are still
-  **pending** ("se registrarán tras la sesión de equipo del 2026-07-09"). If you
-  formalize that work, add the CC/ADR and update `registro.md` and the ADR index
+- Change-control baseline (see `docs/cambios/registro.md` for the authoritative
+  list): **CC-001…CC-012** are registered. CC-003…CC-010 formalized the
+  cohort-isolation + first security-hardening work (ADR-0004); **CC-011**
+  (audit security hardening, refines ADR-0004) and **CC-012** (code hygiene +
+  type reconciliation, ADR-0007) are the latest, both implemented. When you
+  formalize new work, add the CC/ADR and update `registro.md` and the ADR index
   — do not cite a CC/ADR number that does not yet exist on disk.
+- **Types are backend-canonical (ADR-0007).** `backend/src/types.ts` owns the
+  data contract; `frontend/src/types.ts` is a hand-kept mirror that may only add
+  the client-only fields marked in its header. Keep them in sync.
 - Before deploying, run `docs/pruebas/checklist-humo.md` end to end.
 
 ## Style
