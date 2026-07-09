@@ -39,13 +39,11 @@ parity with the original. The old single-file app lives only in git history
   different cohorts no longer collide.
 - Students reach a cohort via the `?grupo=<id>` link; the id is a slug derived
   from the label (`slugify` in `cohorts.ts`).
-- **Id normalization is only in resolution.** `getCohort`/`getActiveCohort`
-  `slugify` the lookup, but the prefix reads/deletes (`loadTeams`, `loadPrompts`,
-  `countCohort`, `deleteSubmission`) and `updateCohort`/`archiveCohort` assume the
-  caller already passes the **canonical slug** (the UI always does). A
-  non-canonical id resolves the cohort but returns an empty list / spurious 404 —
-  never cross-cohort access. If you add a code path that takes a raw id, normalize
-  it first.
+- **Id normalization is centralized.** The prefix helpers (`cohortPrefix`/
+  `teamPrefix`/`promptPrefix`) and `updateCohort` all `slugify` the id, same as
+  `getCohort`/`getActiveCohort` (CC-007). So every prefix read/delete/update
+  accepts a non-canonical id (e.g. "Julio 2026") consistently; it's idempotent
+  for canonical slugs. Writes still pass the resolved `cohort.id`.
 
 ## Layout & commands
 
@@ -100,11 +98,12 @@ parity with the original. The old single-file app lives only in git history
 
 ## Known quirks
 
-1. **DB writes fail outside Replit.** `@replit/database` needs `REPLIT_DB_URL`,
-   which only exists in a Replit workspace. Locally the UI loads and reads come
-   back empty, but writes return `Save failed.`. Handlers catch KV errors and
-   return `500` / empty lists rather than crashing the server. Do not chase this
-   as a bug; test real reads/writes on Replit.
+1. **Local dev uses a file-backed store, not the Replit KV.** `@replit/database`
+   needs `REPLIT_DB_URL` (only set inside a Replit workspace). Outside Replit,
+   `backend/src/db.ts` falls back to a file-backed `devStore` (`.dev-kv.json`,
+   gitignored), so reads **and writes work offline** — it is NOT the Replit KV,
+   so still validate real KV behavior on Replit. Handlers wrap KV calls in
+   try/catch and return `500` / empty lists rather than crashing.
 2. The SPA's default student view is `day2`; the admin dashboard's default tab
    is `prompts`.
 3. **The `cohorts` index is not concurrency-safe.** It is a single KV key with
@@ -113,11 +112,6 @@ parity with the original. The old single-file app lives only in git history
    an index entry via last-write-wins; `cohort:<id>:*` data survives and is
    recoverable via `backup.json`. Fine at course scale (one instructor); see
    `docs/requerimientos/no-funcionales.md` "Límites conocidos".
-4. **`GET /api/c/:cohort/teamnames` does not gate on archived.** Unlike the other
-   student routes it skips `getActiveCohort`, so it returns team names for an
-   archived cohort to anyone who knows the slug (team names only; member/LinkedIn/
-   idea data stays passcode-gated). Documented as a known limit; changing it needs
-   a CC.
 
 ## No AI (deliberate)
 

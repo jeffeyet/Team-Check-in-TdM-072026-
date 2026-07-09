@@ -158,11 +158,11 @@ prefijo y un índice de cohortes.
   índice por *last-write-wins*; un fallo del KV a media migración puede duplicar
   un registro. Detalle en
   [no-funcionales.md](../requerimientos/no-funcionales.md) “Límites conocidos”.
-- (−) **Normalización asimétrica del id.** `getCohort`/`getActiveCohort`
-  normalizan con `slugify`, pero las lecturas/borrados por prefijo y
-  `updateCohort` asumen que el caller ya pasa el slug canónico (la UI siempre lo
-  hace). Un id no canónico resuelve la cohorte pero devuelve lista vacía o 404,
-  sin fuga entre cohortes. Registrado en “Límites conocidos”.
+- Normalización del id: originalmente `getCohort`/`getActiveCohort` normalizaban
+  con `slugify` pero las lecturas/borrados por prefijo y `updateCohort` no, así
+  que un id no canónico daba lista vacía o 404 espurio (sin fuga entre cohortes).
+  **Resuelto** en [CC-007](../cambios/CC-007-endurecimiento-cohortes.md): los
+  helpers de prefijo y `updateCohort` ahora aplican `slugify`.
 - La sincronización de los RF/RNF nuevos y afectados de
   [CC-003](../cambios/CC-003-cohortes.md) y
   [CC-004](../cambios/CC-004-seguridad-acceso.md) con `docs/requerimientos/`

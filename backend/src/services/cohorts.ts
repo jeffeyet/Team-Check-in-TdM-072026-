@@ -5,14 +5,18 @@ import { Cohort } from "../types";
 const INDEX_KEY = "cohorts";
 
 // ---- key-prefix helpers (reads are ALWAYS scoped by prefix) ----
+// The id is normalized with slugify so every prefix-based read/delete accepts a
+// non-canonical id (e.g. "Julio 2026") the same way getCohort does. Idempotent
+// for canonical slugs, so callers that already pass cohort.id are unaffected
+// (CC-007). slugify is a hoisted function declaration, safe to call here.
 export function cohortPrefix(id: string): string {
-  return "cohort:" + id + ":";
+  return "cohort:" + slugify(id) + ":";
 }
 export function teamPrefix(id: string): string {
-  return "cohort:" + id + ":team:";
+  return "cohort:" + slugify(id) + ":team:";
 }
 export function promptPrefix(id: string): string {
-  return "cohort:" + id + ":prompt:";
+  return "cohort:" + slugify(id) + ":prompt:";
 }
 
 // slug: lowercase, strip accents, spaces/punct -> single hyphens, trimmed.
@@ -77,8 +81,9 @@ export async function updateCohort(
   id: string,
   patch: { label?: unknown; archived?: unknown }
 ): Promise<Cohort | null> {
+  const norm = slugify(id);
   const list = await getCohorts();
-  const idx = list.findIndex((c) => c.id === id);
+  const idx = list.findIndex((c) => c.id === norm);
   if (idx === -1) return null;
   if (typeof patch.label === "string") {
     const cleanLabel = patch.label.trim().slice(0, 120);

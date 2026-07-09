@@ -19,12 +19,15 @@ router.get("/:cohort", async (req, res) => {
 });
 
 // GET /api/c/:cohort/teamnames -> unique, sorted names for THIS cohort.
-// Never 401; returns {names:[]} on any error.
+// Never 401; returns {names:[]} on any error. Gated on getActiveCohort so an
+// archived/missing cohort yields [] instead of leaking its team names (CC-007).
 router.get("/:cohort/teamnames", async (req, res) => {
   try {
+    const cohort = await getActiveCohort(req.params.cohort);
+    if (!cohort) return res.json({ names: [] });
     const names = [
       ...new Set(
-        (await loadTeams(req.params.cohort)).map((t) => t.teamName).filter(Boolean)
+        (await loadTeams(cohort.id)).map((t) => t.teamName).filter(Boolean)
       ),
     ].sort();
     res.json({ names });

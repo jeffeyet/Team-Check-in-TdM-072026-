@@ -357,13 +357,11 @@ Convenciones y ciclo de vida: [README.md](README.md).
   - `POST /api/admin/cohorts/:id/archive` marca la cohorte como archivada y
     conserva todas sus llaves `cohort:<id>:…`; responde 404 `Cohort not found.`
     si no existe.
-  - Una cohorte archivada deja de ser accesible para alumnos (`getActiveCohort`
-    la excluye; el alumno recibe 404 en `/api/c/:cohort`). **Excepción conocida
-    (revisión de cohortes):** `GET /api/c/:cohort/teamnames` **no** aplica el
-    gate de archivado y sigue devolviendo los nombres de equipo de una cohorte
-    archivada a quien conozca el slug (solo nombres de equipo; miembros, LinkedIn
-    e ideas siguen tras passcode). Ver
-    [no-funcionales.md](no-funcionales.md) “Límites conocidos”.
+  - Una cohorte archivada deja de ser accesible para alumnos: `getActiveCohort`
+    la excluye, y **todas** las rutas de alumno la rechazan — `GET /api/c/:cohort`
+    responde 404 y `GET /api/c/:cohort/teamnames` devuelve `{names: []}` (gate
+    añadido por [CC-007](../cambios/CC-007-endurecimiento-cohortes.md); antes
+    `teamnames` no aplicaba el gate).
   - La interfaz pide confirmación indicando explícitamente que los datos se
     conservan ("Its data is kept, not deleted.").
   - Una cohorte archivada sigue siendo visible y legible para el instructor.

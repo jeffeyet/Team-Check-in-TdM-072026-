@@ -238,7 +238,10 @@ priorización futura se decide en [F1 del roadmap](../roadmap.md)):
 Hallazgos de la revisión multiagente de la lógica de cohortes, confirmados
 contra el código. Son riesgos de baja probabilidad a la escala del curso (un
 instructor, pocas cohortes) o límites intencionales; se registran como hechos.
-Ninguno es una fuga de datos entre cohortes ni una escritura cruzada.
+Ninguno es una fuga de datos entre cohortes ni una escritura cruzada. Otros dos
+hallazgos de la misma revisión (el gate de archivado de `teamnames` y la
+normalización asimétrica del id) se **corrigieron** en
+[CC-007](../cambios/CC-007-endurecimiento-cohortes.md); ver “Resueltos” abajo.
 
 - **Índice `cohorts` sin atomicidad (concurrencia).** El índice vive en una sola
   llave con lectura-modificación-escritura sin compare-and-set (Replit KV no
@@ -257,20 +260,6 @@ Ninguno es una fuga de datos entre cohortes ni una escritura cruzada.
   `team:*`/`prompt:*` heredado en una sola cohorte destino (no separa ediciones
   previas; los homónimos se colapsan al deduplicar). Es una acción de adopción de
   una sola vez; conviene respaldar antes (RF-016).
-- **`teamnames` no aplica el gate de archivado.** `GET /api/c/:cohort/teamnames`
-  (`backend/src/routes/student.ts:23-34`) no pasa por `getActiveCohort`, así que
-  devuelve los nombres de equipo de una cohorte **archivada** a quien conozca el
-  slug (sin passcode). Solo expone nombres de equipo; miembros, LinkedIn e ideas
-  siguen protegidos por passcode en admin. Matiza [RF-015](funcionales.md#rf-015--archivar-cohorte-borrado-suave).
-  Corrección posible (vía CC): añadir `getActiveCohort` al handler.
-- **Normalización del id solo en la resolución.** `getCohort`/`getActiveCohort`
-  normalizan con `slugify` (`cohorts.ts:41`), pero las lecturas/borrados por
-  prefijo (`loadTeams`, `loadPrompts`, `countCohort`, `deleteSubmission`) y
-  `updateCohort`/`archiveCohort` asumen que el caller ya pasa el slug **canónico**
-  (la UI siempre lo hace). Un id no canónico (p. ej. `Julio-2026`) resuelve la
-  cohorte pero devuelve lista vacía o 404 espurio, **sin** fuga entre cohortes ni
-  escritura cruzada (las escrituras usan el `cohort.id` ya resuelto). La
-  verificación anti-borrado-cruzado de `deleteSubmission` es correcta.
 - **`teamCount` puede exceder las filas visibles del roster.** `countCohort`
   (`cohorts.ts:98-106`) cuenta las llaves crudas del prefijo (incluye reenvíos),
   mientras que el roster deduplica por nombre (última gana), así que el conteo por
@@ -289,3 +278,12 @@ Ninguno es una fuga de datos entre cohortes ni una escritura cruzada.
   borrado total destructivo (antiguo [RF-008](funcionales.md#rf-008--borrado-total-por-día--reemplazado))
   y se sustituyó por archivar cohorte / borrado suave (RF-015), borrado
   individual de envíos (RF-014) y respaldo completo JSON (RF-016).
+- **`teamnames` servía cohortes archivadas** → resuelto por
+  [CC-007](../cambios/CC-007-endurecimiento-cohortes.md): el handler ahora pasa
+  por `getActiveCohort` y devuelve `{names: []}` para una cohorte archivada o
+  inexistente (`backend/src/routes/student.ts`).
+- **Normalización asimétrica del id de cohorte** → resuelto por
+  [CC-007](../cambios/CC-007-endurecimiento-cohortes.md): los helpers de prefijo
+  (`cohortPrefix`/`teamPrefix`/`promptPrefix`) y `updateCohort` aplican `slugify`,
+  así que las lecturas/borrados/actualizaciones aceptan un id no canónico igual
+  que `getCohort` (`backend/src/services/cohorts.ts`).
