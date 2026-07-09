@@ -76,6 +76,7 @@
   .humancheck{background:var(--accent-soft);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px}
   .humancheck .eq{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:10px}
   .humancheck input{max-width:130px}
+  .humancheck .btn{width:auto;margin-top:0;margin-left:8px;vertical-align:top}
   .chkhint{font-size:13px;font-weight:600;color:var(--accent);margin-top:8px;min-height:18px}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .btn-primary:disabled:hover{background:var(--accent)}
@@ -297,6 +298,7 @@ function renderGate(){
       <div class="humancheck">
         <div class="eq" id="eq"></div>
         <input type="text" id="f-human" inputmode="numeric" placeholder="x = ?" autocomplete="off">
+        <button class="btn btn-primary btn-sm" id="confirm" disabled>Confirm</button>
         <div class="chkhint" id="chkhint"></div>
       </div>
       <div class="field"><label class="lab" for="f-code">Instructor passcode</label>
@@ -306,34 +308,41 @@ function renderGate(){
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
-  // ---- human check: solve ax + b = c for x ----
-  const code=$('#f-code'), unlockBtn=$('#unlock'), human=$('#f-human'), hint=$('#chkhint'), eq=$('#eq');
-  let answer=0, passed=false;
+  // ---- human check: solve ax + b = c for x, with a two-step prank confirm ----
+  const code=$('#f-code'), unlockBtn=$('#unlock'), human=$('#f-human'), hint=$('#chkhint'), eq=$('#eq'), confirmBtn=$('#confirm');
+  let answer=0, passed=false, armed=false;
   function rnd(min,max){ return min+Math.floor(Math.random()*(max-min+1)); }
   function newEquation(){
     const a=rnd(2,9); answer=rnd(2,9); const b=rnd(1,15); const c=a*answer+b;
     eq.textContent=`${a}x + ${b} = ${c}. Solve for x to unlock.`;
   }
   function lock(){ passed=false; code.disabled=true; unlockBtn.disabled=true; }
-  function checkAnswer(){
+  function resetConfirm(){ armed=false; confirmBtn.textContent='Confirm'; }
+  human.addEventListener('input',()=>{
+    confirmBtn.disabled = human.value.trim()==='';
+    // editing the answer cancels the prank and re-locks any prior pass
+    if(armed){ resetConfirm(); hint.textContent=''; }
+    if(passed){ lock(); hint.textContent=''; }
+  });
+  confirmBtn.addEventListener('click',()=>{
     const val=human.value.trim();
-    if(val==='') return; // empty: stay locked, no error
+    if(val==='') return;
+    if(!armed){
+      // first click: don't validate — prank them
+      armed=true; confirmBtn.textContent="Yes, I'm sure";
+      hint.style.color='var(--accent)'; hint.textContent='Are you sure? Your answer is wrong.';
+      return;
+    }
+    // second click: validate honestly
     if(parseInt(val,10)===answer){
       passed=true; code.disabled=false; unlockBtn.disabled=false;
-      hint.style.color='var(--accent)'; hint.textContent='unlocked ✓';
-      code.focus();
+      hint.style.color='var(--accent)'; hint.textContent="Just kidding, you passed ✓";
+      resetConfirm(); code.focus();
     }else{
       lock(); hint.style.color='var(--accent)'; hint.textContent='Not quite — here is a fresh one.';
-      newEquation(); human.value='';
+      newEquation(); human.value=''; confirmBtn.disabled=true; resetConfirm();
     }
-  }
-  human.addEventListener('input',()=>{
-    // instant unlock the moment the correct value is typed; clear stale hint otherwise
-    if(parseInt(human.value.trim(),10)===answer){ checkAnswer(); }
-    else if(passed){ lock(); hint.textContent=''; }
   });
-  human.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
-  human.addEventListener('blur',checkAnswer);
   newEquation();
   const go=async()=>{
     if(!passed) return; // access gated behind the human check
