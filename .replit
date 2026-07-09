@@ -1,0 +1,6 @@
+run = "npm run install:all && npm run build && npm run start"
+entrypoint = "backend/src/index.ts"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["sh", "-c", "npm run install:all && npm run build && npm run start"]
