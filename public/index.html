@@ -73,6 +73,13 @@
   .confirm p{color:var(--muted);margin:0 0 20px}
   .confirm .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .gate{max-width:360px}
+  .humancheck{background:var(--accent-soft);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px}
+  .humancheck .eq{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:10px}
+  .humancheck input{max-width:130px}
+  .chkhint{font-size:13px;font-weight:600;color:var(--accent);margin-top:8px;min-height:18px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary:disabled:hover{background:var(--accent)}
+  input:disabled{opacity:.6;cursor:not-allowed}
   .tabbar{display:flex;gap:8px;margin-bottom:18px}
   .tab{padding:8px 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--accent-soft);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}
   .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -287,14 +294,49 @@ function renderGate(){
   const wrap=document.createElement('div'); wrap.className='wrap';
   wrap.innerHTML = header('Instructor access.') + `
     <div class="card gate">
+      <div class="humancheck">
+        <div class="eq" id="eq"></div>
+        <input type="text" id="f-human" inputmode="numeric" placeholder="x = ?" autocomplete="off">
+        <div class="chkhint" id="chkhint"></div>
+      </div>
       <div class="field"><label class="lab" for="f-code">Instructor passcode</label>
-      <input type="text" id="f-code" placeholder="enter passcode" autocomplete="off"></div>
-      <button class="btn btn-primary" id="unlock">View submissions</button>
+      <input type="text" id="f-code" placeholder="enter passcode" autocomplete="off" disabled></div>
+      <button class="btn btn-primary" id="unlock" disabled>View submissions</button>
       <div class="msg" id="gmsg"></div>
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
+  // ---- human check: solve ax + b = c for x ----
+  const code=$('#f-code'), unlockBtn=$('#unlock'), human=$('#f-human'), hint=$('#chkhint'), eq=$('#eq');
+  let answer=0, passed=false;
+  function rnd(min,max){ return min+Math.floor(Math.random()*(max-min+1)); }
+  function newEquation(){
+    const a=rnd(2,9); answer=rnd(2,9); const b=rnd(1,15); const c=a*answer+b;
+    eq.textContent=`${a}x + ${b} = ${c}. Solve for x to unlock.`;
+  }
+  function lock(){ passed=false; code.disabled=true; unlockBtn.disabled=true; }
+  function checkAnswer(){
+    const val=human.value.trim();
+    if(val==='') return; // empty: stay locked, no error
+    if(parseInt(val,10)===answer){
+      passed=true; code.disabled=false; unlockBtn.disabled=false;
+      hint.style.color='var(--accent)'; hint.textContent='unlocked ✓';
+      code.focus();
+    }else{
+      lock(); hint.style.color='var(--accent)'; hint.textContent='Not quite — here is a fresh one.';
+      newEquation(); human.value='';
+    }
+  }
+  human.addEventListener('input',()=>{
+    // instant unlock the moment the correct value is typed; clear stale hint otherwise
+    if(parseInt(human.value.trim(),10)===answer){ checkAnswer(); }
+    else if(passed){ lock(); hint.textContent=''; }
+  });
+  human.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
+  human.addEventListener('blur',checkAnswer);
+  newEquation();
   const go=async()=>{
+    if(!passed) return; // access gated behind the human check
     const code=$('#f-code').value.trim(); const m=$('#gmsg'); m.className='msg';
     try{
       const r=await fetch('/api/prompt-roster?code='+encodeURIComponent(code));
