@@ -106,12 +106,13 @@ parity with the original. The old single-file app lives only in git history
    try/catch and return `500` / empty lists rather than crashing.
 2. The SPA's default student view is `day2`; the admin dashboard's default tab
    is `prompts`.
-3. **The `cohorts` index is not concurrency-safe.** It is a single KV key with
-   read-modify-write and no compare-and-set, so simultaneous management ops (two
-   instructor tabs, a double-click on "create", create+archive at once) can lose
-   an index entry via last-write-wins; `cohort:<id>:*` data survives and is
-   recoverable via `backup.json`. Fine at course scale (one instructor); see
-   `docs/requerimientos/no-funcionales.md` "Límites conocidos".
+3. **The `cohorts` index is a single KV key, mutated under an in-process lock.**
+   No compare-and-set in Replit KV, so `createCohort`/`updateCohort`/
+   `archiveCohort` serialize their read-modify-write through `withIndexLock`
+   (CC-008) — this stops last-write-wins within the single Replit process.
+   Residual: the lock is in-memory, so it would not span multiple instances (not
+   used by this single-service deploy). See `docs/requerimientos/no-funcionales.md`
+   "Límites conocidos".
 
 ## No AI (deliberate)
 

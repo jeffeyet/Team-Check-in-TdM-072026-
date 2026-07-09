@@ -81,10 +81,10 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
   miembro ≤120, LinkedIn ≤300, enlace de documento ≤500 caracteres; máximo
   6 miembros por equipo. Además, la etiqueta de cohorte se trunca a 120.
 - **Estado:** implementado.
-- **Fuente:** `backend/src/routes/student.ts:47-61` (equipo/idea/miembro/LinkedIn
-  y `.slice(0, 6)` de miembros en el Día 1), `:80-85` (equipo/idea/enlace del
-  Día 2); `backend/src/services/cohorts.ts:54` y `:81-82` (etiqueta de cohorte
-  a 120).
+- **Fuente:** `backend/src/routes/student.ts:51-59` (equipo/idea/miembro/LinkedIn
+  y `.slice(0, 6)` de miembros en el Día 1), `:84-86` (equipo/idea/enlace del
+  Día 2); `backend/src/services/cohorts.ts:81` (`createCohort`) y `:116`
+  (`updateCohort`) (etiqueta de cohorte a 120).
 
 ## RNF-005 · Operable con teclado (parcial)
 
@@ -119,7 +119,7 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
 - **Fuente:** `backend/src/services/teams.ts:6-15` (`loadTeams`: un `get` por
   cada llave `cohort:<id>:team:`), `backend/src/services/prompts.ts:6-19`
   (`loadPrompts`: un `get` por cada llave `cohort:<id>:prompt:`),
-  `backend/src/services/cohorts.ts:8-16` (helpers de prefijo).
+  `backend/src/services/cohorts.ts:16-24` (helpers de prefijo).
 
 ---
 
@@ -238,37 +238,24 @@ priorización futura se decide en [F1 del roadmap](../roadmap.md)):
 Hallazgos de la revisión multiagente de la lógica de cohortes, confirmados
 contra el código. Son riesgos de baja probabilidad a la escala del curso (un
 instructor, pocas cohortes) o límites intencionales; se registran como hechos.
-Ninguno es una fuga de datos entre cohortes ni una escritura cruzada. Otros dos
-hallazgos de la misma revisión (el gate de archivado de `teamnames` y la
-normalización asimétrica del id) se **corrigieron** en
-[CC-007](../cambios/CC-007-endurecimiento-cohortes.md); ver “Resueltos” abajo.
+Ninguno es una fuga de datos entre cohortes ni una escritura cruzada. La mayoría
+se **corrigió** en CC-007…CC-010 (ver “Resueltos” abajo); quedan estos dos como
+límites aceptados a la escala del curso:
 
-- **Índice `cohorts` sin atomicidad (concurrencia).** El índice vive en una sola
-  llave con lectura-modificación-escritura sin compare-and-set (Replit KV no
-  ofrece transacciones; `backend/src/services/cohorts.ts:34-36`,
-  `backend/src/db.ts:87-101`). Operaciones de gestión simultáneas (dos pestañas
-  del instructor, doble clic en "crear", o crear+archivar a la vez) pueden perder
-  una entrada del índice por *last-write-wins*, y el check-then-set de
-  `createCohort` (`:61-73`) no garantiza unicidad bajo concurrencia. Los datos
-  `cohort:<id>:*` no se destruyen y son recuperables vía
-  `GET /api/admin/backup.json`. Mitigación: un solo instructor, una pestaña a la
-  vez.
-- **`migrateLegacy` no atómico ni idempotente.** Mueve cada llave con `set`+`del`
-  independientes, sin transacción ni marca de progreso
-  (`backend/src/services/cohorts.ts:140-147`); un fallo del KV entre ambos deja un
-  registro **duplicado** (en legado y prefijado). Además vuelca **todo**
-  `team:*`/`prompt:*` heredado en una sola cohorte destino (no separa ediciones
-  previas; los homónimos se colapsan al deduplicar). Es una acción de adopción de
-  una sola vez; conviene respaldar antes (RF-016).
-- **`teamCount` puede exceder las filas visibles del roster.** `countCohort`
-  (`cohorts.ts:98-106`) cuenta las llaves crudas del prefijo (incluye reenvíos),
-  mientras que el roster deduplica por nombre (última gana), así que el conteo por
-  cohorte del panel puede ser mayor que el número de equipos mostrados. Un
-  **reenvío** del Día 1 eclipsa el envío anterior del mismo nombre en roster y
-  CSV aunque el nuevo sea menos completo (el previo persiste en el KV,
-  recuperable por RF-016 / borrable por RF-014). Los truncados del envío son
-  **silenciosos**: idea ≤240, LinkedIn ≤300 y `members.slice(0,6)` descarta
-  miembros extra sin aviso al alumno ni al instructor.
+- **`migrateLegacy` funde ediciones (inherente) y no es transaccional.** Vuelca
+  **todo** el legado plano `team:*`/`prompt:*` en una sola cohorte destino (no
+  separa ediciones previas; los homónimos se colapsan al deduplicar), porque las
+  llaves heredadas no llevan información de edición para separarlas. El movimiento
+  sigue siendo `set`+`del` sin transacción (Replit KV no la ofrece), pero desde
+  [CC-009](../cambios/CC-009-migratelegacy-idempotente.md) es **idempotente**:
+  re-ejecutar converge sin duplicar. Es una acción de una sola vez; respaldar
+  antes (RF-016).
+- **Reenvío del Día 1 (“última gana”) y truncados silenciosos.** Un reenvío del
+  mismo nombre de equipo eclipsa el envío anterior en roster y CSV aunque el nuevo
+  sea menos completo — comportamiento **intencional**; el previo persiste en el KV,
+  recuperable por RF-016 / borrable por RF-014. Los truncados del envío son
+  silenciosos: idea ≤240, LinkedIn ≤300 y `members.slice(0,6)` descarta miembros
+  extra sin aviso (RNF-004).
 
 ### Resueltos el 2026-07-09 (antes eran límites; ya no aplican)
 
@@ -287,3 +274,18 @@ normalización asimétrica del id) se **corrigieron** en
   (`cohortPrefix`/`teamPrefix`/`promptPrefix`) y `updateCohort` aplican `slugify`,
   así que las lecturas/borrados/actualizaciones aceptan un id no canónico igual
   que `getCohort` (`backend/src/services/cohorts.ts`).
+- **Índice `cohorts` sin atomicidad (lost update / TOCTOU)** → resuelto por
+  [CC-008](../cambios/CC-008-indice-cohortes-serializado.md): un mutex en proceso
+  (`withIndexLock`) serializa las mutaciones del índice (`createCohort`/
+  `updateCohort`/`archiveCohort`), eliminando el *last-write-wins* y garantizando
+  la unicidad de id dentro del proceso único de Replit. Límite residual: es
+  **en memoria**, no cubre múltiples instancias (no aplicable a este despliegue).
+- **`migrateLegacy` podía duplicar ante fallo parcial** → mitigado por
+  [CC-009](../cambios/CC-009-migratelegacy-idempotente.md): comprueba si el
+  destino ya existe antes de `set` y solo borra el origen sobrante, de modo que una
+  re-ejecución converge sin duplicar. (La fusión de todo el legado en una cohorte
+  sigue siendo inherente; ver arriba.)
+- **`teamCount` excedía las filas del roster** → resuelto por
+  [CC-010](../cambios/CC-010-teamcount-consistente.md): `countCohort` deduplica el
+  `teamCount` (coincide con el roster de RF-004); `promptCount` sigue crudo porque
+  todas las bitácoras se muestran (RF-005).

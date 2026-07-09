@@ -47,10 +47,10 @@ prefijo y un índice de cohortes.
 
 - **Modelo de datos.** Un índice bajo la llave `cohorts` guarda un arreglo JSON
   de `Cohort {id, label, createdAt, archived}`
-  (`backend/src/types.ts:31-36`, `backend/src/services/cohorts.ts:29-36`). Los
+  (`backend/src/types.ts:31-36`, `backend/src/services/cohorts.ts:37-44`). Los
   datos de cada grupo viven bajo los prefijos `cohort:<id>:team:*` y
-  `cohort:<id>:prompt:*` (`backend/src/services/cohorts.ts:8-16`). El `id` es un
-  slug derivado del label (`slugify`, `:19-27`).
+  `cohort:<id>:prompt:*` (`backend/src/services/cohorts.ts:16-24`). El `id` es un
+  slug derivado del label (`slugify`, `:27-35`).
 - **Lecturas siempre por prefijo.** Se elimina el `list()` global de las
   **lecturas de datos por cohorte**: toda lectura de equipos/bitácoras se acota
   al prefijo de una cohorte (`backend/src/services/teams.ts:6-15`,
@@ -80,15 +80,15 @@ prefijo y un índice de cohortes.
   (`routes/teams.ts`, `routes/prompts.ts`).
 - **Seguridad de datos en vez de borrado destructivo.** El borrado total
   desaparece y se reemplaza por: **archivar** cohorte (borrado suave,
-  `archived:true`, `backend/src/services/cohorts.ts:93-96`), **borrado
+  `archived:true`, `backend/src/services/cohorts.ts:126-129`), **borrado
   individual** de un envío con verificación de que la llave pertenece a la
-  cohorte (`:111-123`) y **respaldo completo** en JSON (`buildBackup`,
-  `:152-161`; ruta `GET /api/admin/backup.json`).
+  cohorte (`:147-159`) y **respaldo completo** en JSON (`buildBackup`,
+  `:197-206`; ruta `GET /api/admin/backup.json`).
 - **Migración segura para adopción sin pérdida
   ([RES-005](../requerimientos/restricciones.md)).** `migrateLegacy` mueve las
   llaves heredadas sin prefijo (`team:*` / `prompt:*`) a la caja de una
   cohorte, dejando intactas las que ya están bajo `cohort:`
-  (`backend/src/services/cohorts.ts:127-149`; ruta
+  (`backend/src/services/cohorts.ts:163-194`; ruta
   `POST /api/admin/migrate-legacy`). En el caso feliz los datos existentes no se
   pierden ni quedan ilegibles (mueve con `set` antes de `del`). *Matices
   registrados en la revisión de cohortes (ver
@@ -151,12 +151,15 @@ prefijo y un índice de cohortes.
   `get` por llave). Es aceptable a la escala del curso
   ([RNF-006](../requerimientos/no-funcionales.md)); si deja de serlo, aplica el
   criterio de disparo hacia una base relacional.
-- (−) **Sin atomicidad en el KV.** El índice `cohorts` es una sola llave con
-  lectura-modificación-escritura sin compare-and-set, y `migrateLegacy` mueve con
-  `set`+`del` no atómicos. A la escala del curso (un instructor) el riesgo es
-  bajo pero real: dos pestañas o un doble clic pueden perder una entrada del
-  índice por *last-write-wins*; un fallo del KV a media migración puede duplicar
-  un registro. Detalle en
+- Atomicidad en el KV: el índice `cohorts` es una sola llave sin compare-and-set
+  y `migrateLegacy` mueve con `set`+`del`. Las mutaciones del índice ahora se
+  **serializan en el proceso** (mutex `withIndexLock`), eliminando el
+  *last-write-wins* y el TOCTOU de unicidad
+  ([CC-008](../cambios/CC-008-indice-cohortes-serializado.md)); la migración es
+  **idempotente** (re-ejecutable sin duplicar,
+  [CC-009](../cambios/CC-009-migratelegacy-idempotente.md)). Límite residual: el
+  mutex es en memoria (un solo servicio Replit), no cubre múltiples instancias;
+  y la migración funde todo el legado en una cohorte (inherente). Detalle en
   [no-funcionales.md](../requerimientos/no-funcionales.md) “Límites conocidos”.
 - Normalización del id: originalmente `getCohort`/`getActiveCohort` normalizaban
   con `slugify` pero las lecturas/borrados por prefijo y `updateCohort` no, así

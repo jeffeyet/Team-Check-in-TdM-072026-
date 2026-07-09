@@ -1,5 +1,9 @@
 import * as db from "../db";
 import { Cohort } from "../types";
+// Call-time import for the deduped team count (CC-010). teams.ts imports the
+// prefix helpers from here; the cycle is call-time only (no top-level use on
+// either side), so it resolves safely.
+import { loadTeams, dedupeTeams } from "./teams";
 
 // The cohort index lives under a single key holding a JSON array.
 const INDEX_KEY = "cohorts";
@@ -39,6 +43,22 @@ async function saveCohorts(list: Cohort[]): Promise<void> {
   await db.set(INDEX_KEY, list);
 }
 
+// Serialize read-modify-write on the single `cohorts` index key. Replit KV has
+// no compare-and-set, but the app runs as ONE process, so an in-process queue
+// stops concurrent mutations from clobbering each other, last-write-wins
+// (CC-008). In-memory only: it does not span multiple instances (not used by
+// this single-service deployment).
+let indexLock: Promise<unknown> = Promise.resolve();
+function withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = indexLock.then(fn, fn);
+  // Keep the chain going whether fn resolves or rejects, without leaking.
+  indexLock = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
 export async function getCohort(id: string): Promise<Cohort | null> {
   // Match case-insensitively: stored ids are slugs, so normalize the lookup —
   // a student typing "Julio 2026" or "JULIO-2026" still finds "julio-2026".
@@ -62,19 +82,23 @@ export async function createCohort(label: string, id?: string): Promise<CreateRe
   if (!cleanLabel) return { ok: false, status: 400, error: "Missing label." };
   const finalId = id ? slugify(id) : slugify(cleanLabel);
   if (!finalId) return { ok: false, status: 400, error: "Invalid cohort id." };
-  const list = await getCohorts();
-  if (list.some((c) => c.id === finalId)) {
-    return { ok: false, status: 409, error: "Cohort already exists." };
-  }
-  const cohort: Cohort = {
-    id: finalId,
-    label: cleanLabel,
-    createdAt: Date.now(),
-    archived: false,
-  };
-  list.push(cohort);
-  await saveCohorts(list);
-  return { ok: true, cohort };
+  // Serialized so a concurrent create can't pass the uniqueness check and then
+  // clobber the index (CC-008).
+  return withIndexLock(async () => {
+    const list = await getCohorts();
+    if (list.some((c) => c.id === finalId)) {
+      return { ok: false, status: 409, error: "Cohort already exists." };
+    }
+    const cohort: Cohort = {
+      id: finalId,
+      label: cleanLabel,
+      createdAt: Date.now(),
+      archived: false,
+    };
+    list.push(cohort);
+    await saveCohorts(list);
+    return { ok: true, cohort };
+  });
 }
 
 export async function updateCohort(
@@ -82,16 +106,20 @@ export async function updateCohort(
   patch: { label?: unknown; archived?: unknown }
 ): Promise<Cohort | null> {
   const norm = slugify(id);
-  const list = await getCohorts();
-  const idx = list.findIndex((c) => c.id === norm);
-  if (idx === -1) return null;
-  if (typeof patch.label === "string") {
-    const cleanLabel = patch.label.trim().slice(0, 120);
-    if (cleanLabel) list[idx].label = cleanLabel;
-  }
-  if (typeof patch.archived === "boolean") list[idx].archived = patch.archived;
-  await saveCohorts(list);
-  return list[idx];
+  // Serialized read-modify-write so it doesn't race other index mutations
+  // (CC-008).
+  return withIndexLock(async () => {
+    const list = await getCohorts();
+    const idx = list.findIndex((c) => c.id === norm);
+    if (idx === -1) return null;
+    if (typeof patch.label === "string") {
+      const cleanLabel = patch.label.trim().slice(0, 120);
+      if (cleanLabel) list[idx].label = cleanLabel;
+    }
+    if (typeof patch.archived === "boolean") list[idx].archived = patch.archived;
+    await saveCohorts(list);
+    return list[idx];
+  });
 }
 
 // Soft delete: mark archived, never destroy data.
@@ -103,11 +131,14 @@ export async function archiveCohort(id: string): Promise<boolean> {
 export async function countCohort(
   id: string
 ): Promise<{ teamCount: number; promptCount: number }> {
-  const [teams, prompts] = await Promise.all([
-    db.list(teamPrefix(id)),
+  const [teams, promptKeys] = await Promise.all([
+    loadTeams(id),
     db.list(promptPrefix(id)),
   ]);
-  return { teamCount: teams.length, promptCount: prompts.length };
+  // teamCount matches the deduped roster (RF-004) so the number equals the rows
+  // the instructor sees; promptCount is raw because all prompt logs are shown
+  // (RF-005). (CC-010)
+  return { teamCount: dedupeTeams(teams).length, promptCount: promptKeys.length };
 }
 
 // Delete a single submission. Accepts either the full key
@@ -144,9 +175,18 @@ export async function migrateLegacy(cohortId: string): Promise<number> {
   let moved = 0;
   for (const k of [...teamKeys, ...promptKeys]) {
     if (k.startsWith("cohort:")) continue; // safety net
+    const destKey = prefix + k;
+    // Idempotent: if a previous run wrote the destination but failed before the
+    // del, just drop the leftover source instead of duplicating/recounting
+    // (CC-009). Move is still set-then-del (Replit KV has no transaction).
+    const existingDest = await db.get(destKey);
+    if (existingDest !== null && existingDest !== undefined) {
+      await db.del(k);
+      continue;
+    }
     const v = await db.get(k);
     if (v === null || v === undefined) continue;
-    await db.set(prefix + k, v);
+    await db.set(destKey, v);
     await db.del(k);
     moved++;
   }

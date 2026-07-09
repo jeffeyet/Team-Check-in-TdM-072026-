@@ -80,7 +80,7 @@ Particularidades que conviene conocer:
   la lista global. Esto elimina el barrido O(n) sobre todo el KV que existía antes
   y garantiza que una cohorte no ve datos de otra
   (`backend/src/services/{teams,prompts}.ts`, prefijos en
-  `backend/src/services/cohorts.ts:8-16`). *Excepción intencional:* el respaldo
+  `backend/src/services/cohorts.ts:16-24`). *Excepción intencional:* el respaldo
   (`buildBackup`, `db.list("")`) y la migración de datos heredados
   (`migrateLegacy`, `db.list("team:")`/`db.list("prompt:")`) sí barren llaves
   amplias; son operaciones de admin, no lecturas de datos por cohorte.
@@ -92,7 +92,7 @@ Particularidades que conviene conocer:
   bitácoras del Día 2 se muestran todas (`backend/src/services/prompts.ts`).
 - **IDs de cohorte por slug.** El id se deriva del nombre (o de un id
   personalizado) con `slugify` (minúsculas, sin acentos, guiones)
-  (`backend/src/services/cohorts.ts:19-27`, `53-71`). Crear una cohorte con id
+  (`backend/src/services/cohorts.ts:27-35`, `80-102`). Crear una cohorte con id
   repetido devuelve 409.
 - **Robustez.** Los handlers que leen el KV capturan errores y responden 500
   (`Load failed.` / `Save failed.`) en vez de tumbar el servidor; fuera de

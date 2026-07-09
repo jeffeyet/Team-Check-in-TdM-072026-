@@ -30,7 +30,7 @@ requiere CC y, si es técnica, ADR. Convenciones: [README.md](README.md).
   sin base de datos nueva. Cambió el esquema de llaves: un índice único
   `cohorts` (array JSON de cohortes) y datos por cohorte bajo los prefijos
   `cohort:<id>:team:*` y `cohort:<id>:prompt:*`
-  (`backend/src/services/cohorts.ts:5,8-16`). Las llaves heredadas `team:*` /
+  (`backend/src/services/cohorts.ts:5,16-24`). Las llaves heredadas `team:*` /
   `prompt:*` siguen siendo legibles (ver RES-005).
 
 ## RES-003 · Stack moderno sobre Replit, sin infraestructura nueva
@@ -73,7 +73,7 @@ requiere CC y, si es técnica, ADR. Convenciones: [README.md](README.md).
   falta, mueve valor por valor y borra la original). El valor de cada registro
   conserva su formato. Esto reemplaza la garantía de "solo lectura por paridad"
   por un plan de migración concreto y ejecutable.
-- **Fuente:** `backend/src/services/cohorts.ts:124-146` (`migrateLegacy`).
+- **Fuente:** `backend/src/services/cohorts.ts:163-194` (`migrateLegacy`).
 
 ## RES-006 · Plazo de la propuesta
 
