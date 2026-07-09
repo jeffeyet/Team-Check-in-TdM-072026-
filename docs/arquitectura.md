@@ -75,12 +75,15 @@ separada (un grupo / edición del curso); ver `backend/src/types.ts:29-36`.
 
 Particularidades que conviene conocer:
 
-- **Lecturas SIEMPRE por prefijo.** Cada servicio lista solo las llaves de su
-  cohorte (`db.list(teamPrefix(id))` / `db.list(promptPrefix(id))`), nunca la
-  lista global. Esto elimina el barrido O(n) sobre todo el KV que existía antes
+- **Lecturas SIEMPRE por prefijo.** Cada servicio de datos lista solo las llaves
+  de su cohorte (`db.list(teamPrefix(id))` / `db.list(promptPrefix(id))`), nunca
+  la lista global. Esto elimina el barrido O(n) sobre todo el KV que existía antes
   y garantiza que una cohorte no ve datos de otra
   (`backend/src/services/{teams,prompts}.ts`, prefijos en
-  `backend/src/services/cohorts.ts:8-16`).
+  `backend/src/services/cohorts.ts:8-16`). *Excepción intencional:* el respaldo
+  (`buildBackup`, `db.list("")`) y la migración de datos heredados
+  (`migrateLegacy`, `db.list("team:")`/`db.list("prompt:")`) sí barren llaves
+  amplias; son operaciones de admin, no lecturas de datos por cohorte.
 - **Dedupe por cohorte.** El roster del Día 1 muestra un solo registro por
   nombre de equipo (trim + lowercase), tomando el más reciente. Como el dedupe
   opera sobre la lista ya acotada a una cohorte (`dedupeTeams` en

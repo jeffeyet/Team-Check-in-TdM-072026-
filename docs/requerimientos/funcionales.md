@@ -277,10 +277,10 @@ Convenciones y ciclo de vida: [README.md](README.md).
     copiar.
   - Todas las rutas exigen el header `X-Passcode` (401 sin passcode válido).
 - **Estado:** implementado.
-- **Fuente:** `backend/src/services/cohorts.ts:29-87` (`getCohorts`,
+- **Fuente:** `backend/src/services/cohorts.ts:29-90` (`getCohorts`,
   `getCohort`, `createCohort` con `slugify` en `:19-27` y validaciones en
-  `:53-71`, `updateCohort` para renombrar/archivar en `:73-87`),
-  `backend/src/services/cohorts.ts:95-103` (`countCohort`),
+  `:56-74`, `updateCohort` para renombrar/archivar en `:76-90`),
+  `backend/src/services/cohorts.ts:98-106` (`countCohort`),
   `backend/src/routes/admin.ts:23-60` (`GET/POST /cohorts`, `PATCH /cohorts/:id`);
   `frontend/src/views/Admin.tsx:121-295` (`CohortsView`: alta/listado),
   `:91-117` (`ShareLink`: enlace + copiar), `frontend/src/api.ts:75-124`
@@ -303,7 +303,7 @@ Convenciones y ciclo de vida: [README.md](README.md).
     de "grupo no encontrado".
 - **Estado:** implementado.
 - **Fuente:** `backend/src/routes/student.ts:11-19` (`GET /api/c/:cohort`, 404 en
-  `:14`), `backend/src/services/cohorts.ts:44-47` (`getActiveCohort`: excluye
+  `:14`), `backend/src/services/cohorts.ts:47-50` (`getActiveCohort`: excluye
   archivadas); `frontend/src/App.tsx:11-13` (`readGrupo`), `:30-63` (escribe
   `?grupo=` y verifica), `:84-97` (loading/gate),
   `frontend/src/ui.tsx:118-177` (`GroupGate`), `frontend/src/api.ts:25-34`
@@ -341,7 +341,7 @@ Convenciones y ciclo de vida: [README.md](README.md).
     válido.
   - La interfaz pide confirmación ("This cannot be undone.") antes de borrar.
 - **Estado:** implementado.
-- **Fuente:** `backend/src/services/cohorts.ts:108-120` (`deleteSubmission`:
+- **Fuente:** `backend/src/services/cohorts.ts:111-123` (`deleteSubmission`:
   fuerza el prefijo de la cohorte y verifica existencia),
   `backend/src/routes/admin.ts:149-164`
   (`DELETE /cohorts/:id/submissions/:key`); `frontend/src/api.ts:161-174`
@@ -358,13 +358,18 @@ Convenciones y ciclo de vida: [README.md](README.md).
     conserva todas sus llaves `cohort:<id>:…`; responde 404 `Cohort not found.`
     si no existe.
   - Una cohorte archivada deja de ser accesible para alumnos (`getActiveCohort`
-    la excluye; el alumno recibe 404 en `/api/c/:cohort`).
+    la excluye; el alumno recibe 404 en `/api/c/:cohort`). **Excepción conocida
+    (revisión de cohortes):** `GET /api/c/:cohort/teamnames` **no** aplica el
+    gate de archivado y sigue devolviendo los nombres de equipo de una cohorte
+    archivada a quien conozca el slug (solo nombres de equipo; miembros, LinkedIn
+    e ideas siguen tras passcode). Ver
+    [no-funcionales.md](no-funcionales.md) “Límites conocidos”.
   - La interfaz pide confirmación indicando explícitamente que los datos se
     conservan ("Its data is kept, not deleted.").
   - Una cohorte archivada sigue siendo visible y legible para el instructor.
 - **Estado:** implementado.
-- **Fuente:** `backend/src/services/cohorts.ts:90-93` (`archiveCohort` vía
-  `updateCohort`), `:44-47` (`getActiveCohort` excluye archivadas),
+- **Fuente:** `backend/src/services/cohorts.ts:93-96` (`archiveCohort` vía
+  `updateCohort`), `:47-50` (`getActiveCohort` excluye archivadas),
   `backend/src/routes/admin.ts:167-175` (`POST /cohorts/:id/archive`);
   `frontend/src/api.ts:114-124` (`archiveCohort`),
   `frontend/src/views/Admin.tsx:157-166` (confirmación).
@@ -380,7 +385,7 @@ Convenciones y ciclo de vida: [README.md](README.md).
   - La descarga se hace por `fetch`+blob con el header `X-Passcode` (el passcode
     no viaja en la URL); 401 sin passcode válido.
 - **Estado:** implementado.
-- **Fuente:** `backend/src/services/cohorts.ts:148-158` (`buildBackup`:
+- **Fuente:** `backend/src/services/cohorts.ts:152-161` (`buildBackup`:
   `db.list("")` + `db.get` de cada llave), `backend/src/routes/admin.ts:190-199`
   (`GET /backup.json`); `frontend/src/api.ts:227-233` (`downloadBackup`),
   `frontend/src/views/Admin.tsx:185-191` (`doBackup`), botón en `:200-202`.
@@ -399,7 +404,13 @@ Convenciones y ciclo de vida: [README.md](README.md).
   - 401 sin passcode válido.
   - La interfaz pide confirmación e informa cuántos registros se importaron.
 - **Estado:** implementado.
-- **Fuente:** `backend/src/services/cohorts.ts:124-146` (`migrateLegacy`:
+- **Nota (revisión de cohortes):** la migración es correcta en el caso feliz
+  (mueve con `set` antes de `del`), pero **no es atómica ni idempotente** (un
+  fallo del KV entre `set` y `del` puede dejar un registro duplicado) y **funde
+  todo** el legado plano `team:*`/`prompt:*` en una sola cohorte destino (no
+  separa ediciones previas; los homónimos se colapsan al deduplicar). Ver
+  [no-funcionales.md](no-funcionales.md) “Límites conocidos”.
+- **Fuente:** `backend/src/services/cohorts.ts:127-149` (`migrateLegacy`:
   crea la cohorte si falta, mueve `team:`/`prompt:` sin prefijo, ignora las ya
   prefijadas), `backend/src/routes/admin.ts:178-187`
   (`POST /migrate-legacy`); `frontend/src/api.ts:177-189` (`migrateLegacy`),

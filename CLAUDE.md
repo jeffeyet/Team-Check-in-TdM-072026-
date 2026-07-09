@@ -30,13 +30,22 @@ parity with the original. The old single-file app lives only in git history
   `{id, label, createdAt, archived}` (`backend/src/types.ts`,
   `backend/src/services/cohorts.ts`).
 - Per-cohort data lives under key prefixes: `cohort:<id>:team:*` and
-  `cohort:<id>:prompt:*`. **Reads are always scoped by prefix** (there is no
-  global `list()` sweep).
+  `cohort:<id>:prompt:*`. **Per-cohort data reads are always scoped by prefix**
+  (no global `list()` sweep). Two admin ops are the intentional exception:
+  `buildBackup` (`db.list("")`) and `migrateLegacy` (`db.list("team:")`/
+  `db.list("prompt:")`).
 - **Dedupe is per cohort** (`backend/src/services/teams.ts`): `dedupeTeams`
   runs over one cohort's already-scoped list, so teams with the same name in
   different cohorts no longer collide.
 - Students reach a cohort via the `?grupo=<id>` link; the id is a slug derived
   from the label (`slugify` in `cohorts.ts`).
+- **Id normalization is only in resolution.** `getCohort`/`getActiveCohort`
+  `slugify` the lookup, but the prefix reads/deletes (`loadTeams`, `loadPrompts`,
+  `countCohort`, `deleteSubmission`) and `updateCohort`/`archiveCohort` assume the
+  caller already passes the **canonical slug** (the UI always does). A
+  non-canonical id resolves the cohort but returns an empty list / spurious 404 —
+  never cross-cohort access. If you add a code path that takes a raw id, normalize
+  it first.
 
 ## Layout & commands
 
@@ -98,6 +107,17 @@ parity with the original. The old single-file app lives only in git history
    as a bug; test real reads/writes on Replit.
 2. The SPA's default student view is `day2`; the admin dashboard's default tab
    is `prompts`.
+3. **The `cohorts` index is not concurrency-safe.** It is a single KV key with
+   read-modify-write and no compare-and-set, so simultaneous management ops (two
+   instructor tabs, a double-click on "create", create+archive at once) can lose
+   an index entry via last-write-wins; `cohort:<id>:*` data survives and is
+   recoverable via `backup.json`. Fine at course scale (one instructor); see
+   `docs/requerimientos/no-funcionales.md` "Límites conocidos".
+4. **`GET /api/c/:cohort/teamnames` does not gate on archived.** Unlike the other
+   student routes it skips `getActiveCohort`, so it returns team names for an
+   archived cohort to anyone who knows the slug (team names only; member/LinkedIn/
+   idea data stays passcode-gated). Documented as a known limit; changing it needs
+   a CC.
 
 ## No AI (deliberate)
 

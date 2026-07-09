@@ -47,16 +47,20 @@ prefijo y un índice de cohortes.
 
 - **Modelo de datos.** Un índice bajo la llave `cohorts` guarda un arreglo JSON
   de `Cohort {id, label, createdAt, archived}`
-  (`backend/src/types.ts:31-37`, `backend/src/services/cohorts.ts:29-36`). Los
+  (`backend/src/types.ts:31-36`, `backend/src/services/cohorts.ts:29-36`). Los
   datos de cada grupo viven bajo los prefijos `cohort:<id>:team:*` y
   `cohort:<id>:prompt:*` (`backend/src/services/cohorts.ts:8-16`). El `id` es un
   slug derivado del label (`slugify`, `:19-27`).
-- **Lecturas siempre por prefijo.** Se elimina el `list()` global; toda lectura
-  se acota al prefijo de una cohorte (`backend/src/services/teams.ts:6-15`,
+- **Lecturas siempre por prefijo.** Se elimina el `list()` global de las
+  **lecturas de datos por cohorte**: toda lectura de equipos/bitácoras se acota
+  al prefijo de una cohorte (`backend/src/services/teams.ts:6-15`,
   `backend/src/services/prompts.ts`). Esto elimina el barrido O(n) sobre todo
   el KV y hace el **dedupe por cohorte** (`dedupeTeams` opera sobre la lista ya
-  acotada a un grupo, `backend/src/services/teams.ts:17-25`), corrigiendo la
-  colisión de equipos homónimos entre cohortes.
+  acotada a un grupo, `backend/src/services/teams.ts:19-25`), corrigiendo la
+  colisión de equipos homónimos entre cohortes. *Excepción intencional:* el
+  respaldo (`buildBackup`, `db.list("")`) y la migración (`migrateLegacy`,
+  `db.list("team:")`/`db.list("prompt:")`) sí hacen barridos amplios; son
+  operaciones de admin (ver RF-016/RF-017), no lecturas de datos por cohorte.
 - **Modelo de acceso, sin cuentas.** Un **único passcode de instructor** (el
   profesor es el único admin) protege las rutas de gestión; el aislamiento del
   **alumno** es por la **cohorte a la que escribe**, vía el enlace
@@ -76,17 +80,23 @@ prefijo y un índice de cohortes.
   (`routes/teams.ts`, `routes/prompts.ts`).
 - **Seguridad de datos en vez de borrado destructivo.** El borrado total
   desaparece y se reemplaza por: **archivar** cohorte (borrado suave,
-  `archived:true`, `backend/src/services/cohorts.ts:89-93`), **borrado
+  `archived:true`, `backend/src/services/cohorts.ts:93-96`), **borrado
   individual** de un envío con verificación de que la llave pertenece a la
-  cohorte (`:105-120`) y **respaldo completo** en JSON (`buildBackup`,
-  `:148-157`; ruta `GET /api/admin/backup.json`).
+  cohorte (`:111-123`) y **respaldo completo** en JSON (`buildBackup`,
+  `:152-161`; ruta `GET /api/admin/backup.json`).
 - **Migración segura para adopción sin pérdida
   ([RES-005](../requerimientos/restricciones.md)).** `migrateLegacy` mueve las
   llaves heredadas sin prefijo (`team:*` / `prompt:*`) a la caja de una
   cohorte, dejando intactas las que ya están bajo `cohort:`
-  (`backend/src/services/cohorts.ts:122-146`; ruta
-  `POST /api/admin/migrate-legacy`). Los datos existentes no se pierden ni
-  quedan ilegibles.
+  (`backend/src/services/cohorts.ts:127-149`; ruta
+  `POST /api/admin/migrate-legacy`). En el caso feliz los datos existentes no se
+  pierden ni quedan ilegibles (mueve con `set` antes de `del`). *Matices
+  registrados en la revisión de cohortes (ver
+  [no-funcionales.md](../requerimientos/no-funcionales.md) “Límites conocidos”):*
+  el movimiento **no es atómico ni idempotente** (un fallo del KV entre `set` y
+  `del` puede dejar un registro duplicado) y **funde todo** el legado plano
+  `team:*`/`prompt:*` en una sola cohorte destino (no separa ediciones previas;
+  homónimos se colapsan al deduplicar).
 
 ## Alternativas consideradas
 
@@ -141,7 +151,19 @@ prefijo y un índice de cohortes.
   `get` por llave). Es aceptable a la escala del curso
   ([RNF-006](../requerimientos/no-funcionales.md)); si deja de serlo, aplica el
   criterio de disparo hacia una base relacional.
-- Queda **pendiente** sincronizar los documentos de requisitos
-  (`docs/requerimientos/`) con los RF/RNF nuevos y afectados que enumeran
+- (−) **Sin atomicidad en el KV.** El índice `cohorts` es una sola llave con
+  lectura-modificación-escritura sin compare-and-set, y `migrateLegacy` mueve con
+  `set`+`del` no atómicos. A la escala del curso (un instructor) el riesgo es
+  bajo pero real: dos pestañas o un doble clic pueden perder una entrada del
+  índice por *last-write-wins*; un fallo del KV a media migración puede duplicar
+  un registro. Detalle en
+  [no-funcionales.md](../requerimientos/no-funcionales.md) “Límites conocidos”.
+- (−) **Normalización asimétrica del id.** `getCohort`/`getActiveCohort`
+  normalizan con `slugify`, pero las lecturas/borrados por prefijo y
+  `updateCohort` asumen que el caller ya pasa el slug canónico (la UI siempre lo
+  hace). Un id no canónico resuelve la cohorte pero devuelve lista vacía o 404,
+  sin fuga entre cohortes. Registrado en “Límites conocidos”.
+- La sincronización de los RF/RNF nuevos y afectados de
   [CC-003](../cambios/CC-003-cohortes.md) y
-  [CC-004](../cambios/CC-004-seguridad-acceso.md).
+  [CC-004](../cambios/CC-004-seguridad-acceso.md) con `docs/requerimientos/`
+  quedó **hecha** (RF-011…RF-017, RNF-007…RNF-010).

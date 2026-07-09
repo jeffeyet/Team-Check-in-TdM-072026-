@@ -109,7 +109,11 @@ decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
 - **Criterios de aceptación:** las vistas de instructor cargan en tiempos
   razonables con decenas de registros. Cada consulta lee el KV llave por llave
   (O(n) `get`s por request), pero **acotado al prefijo de la cohorte**: ya no
-  hay un barrido global de todas las llaves como en la línea base.
+  hay un barrido global de todas las llaves en las **lecturas de datos por
+  cohorte** como en la línea base. (Excepción intencional: el respaldo completo
+  `buildBackup` con `db.list("")` y la migración `migrateLegacy` con
+  `db.list("team:")`/`db.list("prompt:")` sí barren llaves amplias; son
+  operaciones de admin, ver RF-016/RF-017.)
 - **Estado:** implementado (actualizado por CC-003: lecturas por prefijo de
   cohorte).
 - **Fuente:** `backend/src/services/teams.ts:6-15` (`loadTeams`: un `get` por
@@ -228,6 +232,54 @@ priorización futura se decide en [F1 del roadmap](../roadmap.md)):
   conozca (o adivine) el slug de una cohorte activa puede escribir en ella y
   leer sus nombres de equipo por `GET /api/c/:cohort/teamnames` (rutas de alumno
   sin passcode, por diseño). Las vistas de instructor sí exigen passcode.
+
+### Añadidos por la revisión de cohortes (2026-07-09)
+
+Hallazgos de la revisión multiagente de la lógica de cohortes, confirmados
+contra el código. Son riesgos de baja probabilidad a la escala del curso (un
+instructor, pocas cohortes) o límites intencionales; se registran como hechos.
+Ninguno es una fuga de datos entre cohortes ni una escritura cruzada.
+
+- **Índice `cohorts` sin atomicidad (concurrencia).** El índice vive en una sola
+  llave con lectura-modificación-escritura sin compare-and-set (Replit KV no
+  ofrece transacciones; `backend/src/services/cohorts.ts:34-36`,
+  `backend/src/db.ts:87-101`). Operaciones de gestión simultáneas (dos pestañas
+  del instructor, doble clic en "crear", o crear+archivar a la vez) pueden perder
+  una entrada del índice por *last-write-wins*, y el check-then-set de
+  `createCohort` (`:61-73`) no garantiza unicidad bajo concurrencia. Los datos
+  `cohort:<id>:*` no se destruyen y son recuperables vía
+  `GET /api/admin/backup.json`. Mitigación: un solo instructor, una pestaña a la
+  vez.
+- **`migrateLegacy` no atómico ni idempotente.** Mueve cada llave con `set`+`del`
+  independientes, sin transacción ni marca de progreso
+  (`backend/src/services/cohorts.ts:140-147`); un fallo del KV entre ambos deja un
+  registro **duplicado** (en legado y prefijado). Además vuelca **todo**
+  `team:*`/`prompt:*` heredado en una sola cohorte destino (no separa ediciones
+  previas; los homónimos se colapsan al deduplicar). Es una acción de adopción de
+  una sola vez; conviene respaldar antes (RF-016).
+- **`teamnames` no aplica el gate de archivado.** `GET /api/c/:cohort/teamnames`
+  (`backend/src/routes/student.ts:23-34`) no pasa por `getActiveCohort`, así que
+  devuelve los nombres de equipo de una cohorte **archivada** a quien conozca el
+  slug (sin passcode). Solo expone nombres de equipo; miembros, LinkedIn e ideas
+  siguen protegidos por passcode en admin. Matiza [RF-015](funcionales.md#rf-015--archivar-cohorte-borrado-suave).
+  Corrección posible (vía CC): añadir `getActiveCohort` al handler.
+- **Normalización del id solo en la resolución.** `getCohort`/`getActiveCohort`
+  normalizan con `slugify` (`cohorts.ts:41`), pero las lecturas/borrados por
+  prefijo (`loadTeams`, `loadPrompts`, `countCohort`, `deleteSubmission`) y
+  `updateCohort`/`archiveCohort` asumen que el caller ya pasa el slug **canónico**
+  (la UI siempre lo hace). Un id no canónico (p. ej. `Julio-2026`) resuelve la
+  cohorte pero devuelve lista vacía o 404 espurio, **sin** fuga entre cohortes ni
+  escritura cruzada (las escrituras usan el `cohort.id` ya resuelto). La
+  verificación anti-borrado-cruzado de `deleteSubmission` es correcta.
+- **`teamCount` puede exceder las filas visibles del roster.** `countCohort`
+  (`cohorts.ts:98-106`) cuenta las llaves crudas del prefijo (incluye reenvíos),
+  mientras que el roster deduplica por nombre (última gana), así que el conteo por
+  cohorte del panel puede ser mayor que el número de equipos mostrados. Un
+  **reenvío** del Día 1 eclipsa el envío anterior del mismo nombre en roster y
+  CSV aunque el nuevo sea menos completo (el previo persiste en el KV,
+  recuperable por RF-016 / borrable por RF-014). Los truncados del envío son
+  **silenciosos**: idea ≤240, LinkedIn ≤300 y `members.slice(0,6)` descarta
+  miembros extra sin aviso al alumno ni al instructor.
 
 ### Resueltos el 2026-07-09 (antes eran límites; ya no aplican)
 
