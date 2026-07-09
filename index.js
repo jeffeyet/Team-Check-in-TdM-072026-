@@ -144,5 +144,25 @@ app.get("/api/prompt-export.csv", async (req, res) => {
   res.send(lines.join("\n"));
 });
 
+// Public list of projects (team name + revised idea only, no doc link or passcode
+// required). Powers the "View projects" button on the front end. If a team
+// submitted more than once, only the most recent revised idea is shown.
+app.get("/api/projects", async (req, res) => {
+  try {
+    const logs = await loadPrompts();
+    const latestByTeam = {};
+    for (const l of logs) {
+      const key = (l.teamName || "-").trim().toLowerCase();
+      if (!latestByTeam[key] || (l.ts || 0) > (latestByTeam[key].ts || 0)) {
+        latestByTeam[key] = { teamName: l.teamName, idea: l.idea, ts: l.ts };
+      }
+    }
+    const projects = Object.values(latestByTeam).sort((a, b) => (a.teamName || "").localeCompare(b.teamName || ""));
+    res.json({ projects });
+  } catch (e) {
+    res.status(500).json({ error: "Load failed." });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log("Portal running on port " + PORT));
