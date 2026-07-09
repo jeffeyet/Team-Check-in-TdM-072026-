@@ -24,30 +24,69 @@ Team **Solanum** collaborates on the `Solanum_Branch` branch — see
 
 | Layer    | Choice |
 |----------|--------|
-| Server   | Node.js + Express 4 (`index.js`, no build step) |
+| Backend  | Node.js + Express 4 + TypeScript (`backend/`, CommonJS, compiled with `tsc` → `dist/`) |
+| Frontend | React 18 + TypeScript + Vite SPA (`frontend/`, built to `frontend/dist/`) |
 | Storage  | Replit key-value database (`@replit/database`) — keys `team:*` and `prompt:*` |
-| Frontend | Single static file, `public/index.html` (vanilla JS, inline CSS plus a Google Fonts `<link>`, no framework) |
-| Hosting  | Replit Autoscale deployment |
+| Hosting  | Replit Autoscale deployment, one service (backend serves the built frontend) |
 
-## Repository layout (current)
+The behavior is an exact parity rewrite of the earlier single-file app: same
+`/api` routes, same error messages, same status codes, same character limits,
+same dedupe, same CSV output (verified with the smoke test). What changed is
+where the code lives, not what the system does.
+
+## Repository layout
 
 ```
-index.js            Express server + all API routes (Day 1, Day 2, admin)
-public/index.html   Entire UI: styles, markup, and client JS in one file
-package.json        Dependencies and `npm start` script
-replit              Replit run/deploy config (NOTE: missing its leading dot — inactive as-is)
-gitignore           Ignore rules (NOTE: missing its leading dot — inactive as-is)
-checkin-platform/   Scaling plan: multi-class platform with separate front/back
-                    (planning docs in Spanish + dev skeleton) — see its README.md
+backend/            Express + TypeScript API (see backend/README.md)
+  src/index.ts        Startup; serves frontend/dist + SPA fallback
+  src/config.ts       PASSCODE, PORT
+  src/db.ts           @replit/database wrapper
+  src/auth.ts         checkCode (timing-safe SHA-256)
+  src/types.ts        Shared types
+  src/lib/            csv.ts, respond.ts helpers
+  src/services/       teams.ts, prompts.ts (storage + business logic)
+  src/routes/         teams.ts, prompts.ts (API endpoints)
+frontend/           React + TypeScript + Vite SPA (see frontend/README.md)
+  src/App.tsx         State-based router (default view 'day2')
+  src/api.ts          Typed fetch client
+  src/ui.tsx          Header, DayTabs, ConfirmScreen, keyboard helpers
+  src/views/          Day1.tsx, Day2.tsx, Admin.tsx
+  src/styles.css      CSS ported verbatim from the original
+package.json        Root orchestrator: install:all, build, start, dev, typecheck
+.replit             Replit run/deploy config (one service)
+docs/               Team docs, in Spanish: requirements (RF/RNF/RES), change
+                    control (CC), ADRs, smoke-test checklist, ops runbook —
+                    start at docs/README.md
 CLAUDE.md           Context file for Claude Code sessions
 ```
 
 ## Run locally
 
+Install both workspaces once:
+
 ```bash
-npm install
-npm start           # → http://localhost:3000
+npm run install:all     # installs backend/ and frontend/ deps
 ```
+
+### Option A — two dev servers (hot reload)
+
+```bash
+npm run dev:backend     # API on http://localhost:3000 (tsx watch)
+npm run dev:frontend    # Vite on http://localhost:5173, proxies /api → :3000
+```
+
+Open http://localhost:5173. The Vite dev server proxies `/api` calls to the
+backend on port 3000.
+
+### Option B — production-style build
+
+```bash
+npm run build           # vite build (frontend/dist) + tsc (backend/dist)
+npm start               # node backend/dist/index.js → http://localhost:3000
+```
+
+In this mode the backend serves the built frontend from `frontend/dist` and
+falls back to the SPA entry for non-`/api` routes.
 
 **Heads-up (verified):** outside Replit the server starts and serves the UI,
 but every database operation fails (submissions return `Save failed.`),
@@ -59,21 +98,24 @@ one into your local env).
 ## Deploy on Replit
 
 1. Import the repo: **Create App → Import from GitHub**.
-2. Press **Run** to test, then **Deploy → Autoscale** for a public URL.
+2. Press **Run** to test. `.replit` runs
+   `npm run install:all && npm run build && npm run start` as a single service.
+3. Use **Deploy → Autoscale** for a public URL.
 
 ## Configuration
 
-| Variable   | Default      | Purpose |
-|------------|--------------|---------|
-| `PASSCODE` | `roster2026` | Instructor passcode (set as a Secret in Replit: Tools → Secrets) |
-| `PORT`     | `3000`       | HTTP port |
+| Variable        | Default      | Purpose |
+|-----------------|--------------|---------|
+| `PASSCODE`      | `roster2026` | Instructor passcode (set as a Secret in Replit: Tools → Secrets) |
+| `PORT`          | `3000`       | HTTP port |
+| `REPLIT_DB_URL` | —            | Key-value DB endpoint; **injected automatically by Replit**, not set by hand |
 
 ## API reference
 
 Request bodies are JSON. Responses are JSON too, except the two `*.csv` export
 routes, which return `text/csv` (and a plain-text `Unauthorized` on a bad
 passcode). `code` is the instructor passcode, accepted as a query param or in
-the JSON body.
+the JSON body. Routes are unchanged from the original app (parity).
 
 | Method | Route                    | Auth   | Purpose |
 |--------|--------------------------|--------|---------|
@@ -87,10 +129,24 @@ the JSON body.
 | GET    | `/api/prompt-export.csv?code=` | 🔒 | Day 2 CSV |
 | POST   | `/api/prompt-clear`      | 🔒     | Delete all `prompt:*` records |
 
+## Previous single-file version
+
+The earlier app was a single Express file (`index.js`) plus one static
+`public/index.html`. It is preserved in git history at commit `37760a9`. To
+restore those files into the working tree:
+
+```bash
+git checkout 37760a9 -- index.js public
+```
+
+The current stack (this repo root) is a parity rewrite adopted in
+[ADR-0003](docs/decisiones/0003-stack-moderno-typescript-react.md).
+
 ## Team workflow
 
 - All team work happens on **`Solanum_Branch`** — never commit directly to `main`.
 - Read [`CLAUDE.md`](CLAUDE.md) (Claude Code loads it automatically) before
   making changes with an AI pair.
-- Scaling plan (multi-class platform):
-  [`checkin-platform/`](checkin-platform/README.md).
+- Requirements, change control, ADRs, and the smoke-test checklist live in
+  [`docs/`](docs/README.md). Scope changes go through a change request (CC)
+  before code; run the smoke checklist before deploying.

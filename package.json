@@ -1,11 +1,14 @@
 {
-  "name": "team-checkin",
+  "name": "checkin-platform",
   "version": "1.0.0",
-  "description": "AI Leadership Intensive - team check-in portal",
-  "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "dependencies": {
-    "express": "^4.19.2",
-    "@replit/database": "^2.0.1"
+  "private": true,
+  "description": "Reescritura moderna a paridad del portal Team Check-in (Express + TS backend, React + Vite frontend).",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "start": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "typecheck": "npm --prefix backend run typecheck"
   }
 }
