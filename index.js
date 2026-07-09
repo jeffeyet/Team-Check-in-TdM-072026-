@@ -144,5 +144,69 @@ app.get("/api/prompt-export.csv", async (req, res) => {
   res.send(lines.join("\n"));
 });
 
+// ===================== DAY 3: PROJECT DIAGRAM =====================
+const MAX_DIAGRAM_BOXES = 12;
+const MAX_DIAGRAM_ARROWS = 30;
+
+function cleanDiagramBoxes(boxes) {
+  if (!Array.isArray(boxes)) return [];
+  return boxes.slice(0, MAX_DIAGRAM_BOXES)
+    .filter(b => b && b.id && b.label)
+    .map(b => ({
+      id: String(b.id).slice(0, 40),
+      label: String(b.label).slice(0, 60),
+      x: Number.isFinite(b.x) ? Math.max(0, Math.min(4000, b.x)) : 0,
+      y: Number.isFinite(b.y) ? Math.max(0, Math.min(4000, b.y)) : 0
+    }));
+}
+function cleanDiagramArrows(arrows, boxIds) {
+  if (!Array.isArray(arrows)) return [];
+  const ids = new Set(boxIds);
+  return arrows.slice(0, MAX_DIAGRAM_ARROWS)
+    .filter(a => a && ids.has(a.from) && ids.has(a.to) && a.from !== a.to)
+    .map(a => ({ from: String(a.from).slice(0, 40), to: String(a.to).slice(0, 40) }));
+}
+
+app.post("/api/diagram-submit", async (req, res) => {
+  try {
+    const { teamName, boxes, arrows } = req.body || {};
+    const cleanBoxes = cleanDiagramBoxes(boxes);
+    if (!teamName || cleanBoxes.length === 0) {
+      return res.status(400).json({ error: "Missing team name or diagram boxes." });
+    }
+    const clean = {
+      teamName: String(teamName).slice(0, 120),
+      boxes: cleanBoxes,
+      arrows: cleanDiagramArrows(arrows, cleanBoxes.map(b => b.id)),
+      ts: Date.now()
+    };
+    const key = "diagram:" + clean.ts + "_" + Math.random().toString(36).slice(2, 7);
+    await db.set(key, clean);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Save failed." });
+  }
+});
+
+async function loadDiagrams() {
+  const keys = await db.list("diagram:");
+  const out = [];
+  for (const k of keys) { const v = await db.get(k); if (v) out.push({ key: k, ...v }); }
+  out.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  return out;
+}
+
+app.get("/api/diagram-roster", async (req, res) => {
+  if (!checkCode(req)) return res.status(401).json({ error: "Bad passcode." });
+  try { res.json({ diagrams: dedupeTeams(await loadDiagrams()) }); }
+  catch (e) { res.status(500).json({ error: "Load failed." }); }
+});
+
+app.post("/api/diagram-clear", async (req, res) => {
+  if (!checkCode(req)) return res.status(401).json({ error: "Bad passcode." });
+  try { const keys = await db.list("diagram:"); for (const k of keys) await db.delete(k); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: "Clear failed." }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log("Portal running on port " + PORT));
