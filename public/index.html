@@ -189,10 +189,10 @@ function renderDay1(){
   $('#addm').onclick=addRow;
   const idea=$('#f-idea'), count=$('#count');
   idea.addEventListener('input',()=>count.textContent=idea.value.length+' / 240');
-  $('#submit').onclick=submitDay1;
+  $('#submit').onclick=()=>submitDay1();
 }
-async function submitDay1(){
-  const msg=$('#msg'); msg.className='msg';
+async function submitDay1(force){
+  const msg=$('#msg'); msg.className='msg'; msg.innerHTML='';
   const teamName=$('#f-team').value.trim(); const idea=$('#f-idea').value.trim();
   const members=[];
   document.querySelectorAll('#members .mrow').forEach(row=>{
@@ -204,6 +204,21 @@ async function submitDay1(){
   if(!teamName){ msg.classList.add('err'); msg.textContent='Please add a team name.'; return; }
   if(members.length===0){ msg.classList.add('err'); msg.textContent='Add at least one team member.'; return; }
   if(!idea){ msg.classList.add('err'); msg.textContent='Add your one-sentence idea.'; return; }
+  if(!force){
+    try{
+      const r=await fetch('/api/teamnames'); const d=await r.json();
+      const taken=(d.names||[]).some(n=>n.trim().toLowerCase()===teamName.toLowerCase());
+      if(taken){
+        msg.innerHTML=`A team named &ldquo;${esc(teamName)}&rdquo; already checked in. Submitting will replace their entry.`;
+        const row=document.createElement('div'); row.style.cssText='display:flex;gap:10px;margin-top:10px;flex-wrap:wrap';
+        row.innerHTML=`<button type="button" class="btn btn-primary btn-sm" id="dupConfirm">Replace it</button><button type="button" class="btn btn-ghost btn-sm" id="dupCancel">Cancel</button>`;
+        msg.appendChild(row);
+        $('#dupConfirm').onclick=()=>submitDay1(true);
+        $('#dupCancel').onclick=()=>{ msg.className='msg'; msg.innerHTML=''; };
+        return;
+      }
+    }catch(e){ /* if the check fails, fall through and submit normally */ }
+  }
   const btn=$('#submit'); btn.disabled=true; btn.textContent='Checking in...';
   try{
     const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teamName,members,idea})});
