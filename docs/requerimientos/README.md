@@ -30,6 +30,18 @@ limpios; verificados en Replit). Los requisitos citados como CC-003 / ADR-0004
 dependen de que esos documentos se formalicen en `docs/cambios/` y
 `docs/decisiones/`.
 
+El **2026-07-09** ([CC-005](../cambios/CC-005-dia3-github-onboarding.md),
+[CC-006](../cambios/CC-006-materiales-profesor.md)) se añadieron:
+
+- **RF-018 / RF-019** — Día 3 de onboarding de GitHub como guía read-only y
+  días modelados como datos (guía-como-dato,
+  [ADR-0005](../decisiones/0005-guias-como-datos.md)). Estado `implementado`.
+- **RF-020 / RF-021** — materiales del profesor por día desde archivos estáticos
+  + manifest ([ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md)).
+  Estado `aprobado` (aún sin construir).
+- **RNF-011** — sin IA en tiempo de ejecución (contenido pre-escrito).
+- **Modifican** RF-010 (tercera pestaña; tabs desde el catálogo de días).
+
 ## Formato de un requisito
 
 - **ID** — `RF-###` / `RNF-###` / `RES-###`, secuencial; nunca se reutiliza.

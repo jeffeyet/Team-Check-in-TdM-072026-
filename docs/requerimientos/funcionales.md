@@ -23,6 +23,15 @@ línea base:
 Los requisitos afectados llevan su texto y su **Fuente** actualizados abajo; los
 requisitos nuevos de esta entrega son **RF-011 … RF-017**.
 
+**Actualización 2026-07-09 ([CC-005](../cambios/CC-005-dia3-github-onboarding.md), [CC-006](../cambios/CC-006-materiales-profesor.md)):**
+se añadió un **Día 3** de onboarding de GitHub como **guía read-only**
+(guía-como-dato, [ADR-0005](../decisiones/0005-guias-como-datos.md)) y se aprobó
+mostrar **materiales del profesor por día** desde archivos estáticos
+([ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md)). Requisitos
+nuevos: **RF-018 … RF-021**. Se **modifica** RF-010 (ahora hay una tercera
+pestaña y los tabs se generan desde el catálogo de días). RF-018/RF-019 están
+`implementado`; RF-020/RF-021 están `aprobado` (materiales aún sin construir).
+
 Convenciones y ciclo de vida: [README.md](README.md).
 
 ---
@@ -232,15 +241,18 @@ Convenciones y ciclo de vida: [README.md](README.md).
     muestran una pantalla para ingresar el código del grupo (ver
     [RF-012](#rf-012--acceso-del-alumno-por-cohorte)); no se muestra el
     formulario hasta resolver una cohorte activa.
-  - Las pestañas Monday/Tuesday cambian de vista; "Instructor view" lleva a la
-    puerta de passcode y "Back" regresa.
-- **Estado:** implementado (actualizado por CC-003: flujo de alumno por
-  cohorte).
-- **Fuente:** `frontend/src/App.tsx:15-117` (router por estado; vista por
+  - Las pestañas Monday/Tuesday/Wednesday cambian de vista; Wednesday es una
+    guía read-only (ver [RF-018](#rf-018--día-3-guía-de-onboarding-de-github)) y
+    Monday/Tuesday son los formularios. Los tabs se generan desde el catálogo de
+    días (`content/days.ts`), no cableados uno por uno. "Instructor view" lleva a
+    la puerta de passcode y "Back" regresa.
+- **Estado:** implementado (actualizado por CC-003: flujo de alumno por cohorte;
+  por CC-005: tercer día como guía y tabs desde catálogo).
+- **Fuente:** `frontend/src/App.tsx:15-127` (router por estado; vista por
   defecto `day2` en `:17`; lectura de `?grupo=` en `:11-13` y `:22-38`;
-  verificación de cohorte en `:41-63`; gate/loading en `:84-97`),
-  `frontend/src/ui.tsx:47-80` (`DayTabs` Monday/Tuesday) y `:40-42` (botón
-  "Instructor view ↔ Back").
+  verificación de cohorte en `:41-63`; gate/loading en `:84-97`; ruteo de `day3`
+  a `Guide` en `:110-119`), `frontend/src/ui.tsx:48-77` (`DayTabs` renderizado
+  desde `DAYS.map`, `:59`) y `:40-42` (botón "Instructor view ↔ Back").
 
 ---
 
@@ -392,3 +404,101 @@ Convenciones y ciclo de vida: [README.md](README.md).
   prefijadas), `backend/src/routes/admin.ts:178-187`
   (`POST /migrate-legacy`); `frontend/src/api.ts:177-189` (`migrateLegacy`),
   `frontend/src/views/Admin.tsx:168-183` (confirmación y aviso de conteo).
+
+---
+
+## RF-018 · Día 3: guía de onboarding de GitHub
+
+- **Descripción:** existe un **Día 3** read-only que guía a alumnos no técnicos
+  a conectar su computadora con GitHub y a entender el flujo mínimo (Git, GitHub,
+  clonar, fork, rama, commit, push, pull request, merge), con *handoff* al kit
+  externo `AI_GITHUB_Connection`. **No** es un formulario: no escribe datos ni
+  llama al backend, y el contenido es el mismo para todas las cohortes.
+- **Criterios de aceptación:**
+  - Tras entrar con `?grupo=<id>` válido y pasar el `GroupGate`, aparece una
+    tercera pestaña "Wednesday · GitHub Setup" junto a Monday/Tuesday.
+  - La guía muestra: intro en lenguaje llano; tarjetas-concepto (los 10 términos
+    de arriba, una frase cada uno); un diagrama SVG del ciclo (computadora ⇄
+    GitHub; commit→push→PR→merge); sección "Use the kit" con los pasos, el mensaje
+    exacto para copiar (`Follow AGENTS.md in this project to set up my computer
+    for GitHub.`) y un enlace al repo del kit; tabla "You do vs the AI does";
+    checklist "You're ready when…" (incluye que `ssh -T … does not provide shell
+    access` significa éxito); y una línea de troubleshooting.
+  - No hay formulario que enviar. No añade dependencias nuevas (SVG inline +
+    emoji + CSS) ni rutas/servicios de backend.
+- **Estado:** implementado.
+- **Fuente:** `frontend/src/content/days.ts:17-61` (`day3Guide`, contenido
+  copiado del README/AGENTS.md del kit), `:15` (`KIT_URL`), `:63-70`
+  (catálogo `DAYS` y `getDay`); `frontend/src/views/Guide.tsx:10-140`
+  (renderizador de la guía) y `:142+` (`GitCycle`, diagrama SVG inline);
+  `frontend/src/App.tsx:110-119` (ruteo `day3` → `Guide`, tras el gate);
+  `frontend/src/ui.tsx:48-77` (tercera pestaña). Introducido por
+  [CC-005](../cambios/CC-005-dia3-github-onboarding.md).
+
+## RF-019 · Días modelados como datos (guías read-only)
+
+- **Descripción:** los días del alumno se describen como **datos** en un catálogo
+  tipado; las entradas de tipo `guide` se pintan con un componente genérico, sin
+  ruta ni vista dedicada por guía. Los días `form` (Día 1 / Día 2) siguen siendo
+  componentes-formulario y solo se **referencian** desde el catálogo.
+- **Criterios de aceptación:**
+  - Existe `DayDef {id, dayLabel, tabLabel, kind: "form" | "guide", guide?}` y un
+    arreglo `DAYS` que enumera los tres días.
+  - `DayTabs` se renderiza iterando `DAYS` (añadir o renombrar una pestaña es un
+    cambio de datos, no de la vista).
+  - Un componente `Guide` genérico pinta cualquier día `kind:"guide"` desde su
+    `GuideContent`: agregar una guía nueva es editar el catálogo, sin nueva ruta
+    ni vista.
+  - Los formularios Día 1 / Día 2 no se reescriben.
+- **Estado:** implementado. Avanza la mitad read-only del pendiente
+  "actividades como datos" del [roadmap](../roadmap.md) (F2); la mitad
+  `kind:"form"` sigue pendiente.
+- **Fuente:** `frontend/src/types.ts` (`DayId`, `GuideContent`, `DayDef`),
+  `frontend/src/content/days.ts:63-70` (`DAYS`, `getDay`),
+  `frontend/src/views/Guide.tsx:10-140` (renderizador genérico),
+  `frontend/src/ui.tsx:48-77` (`DayTabs` desde `DAYS.map`). Introducido por
+  [CC-005](../cambios/CC-005-dia3-github-onboarding.md) y
+  [ADR-0005](../decisiones/0005-guias-como-datos.md).
+
+## RF-020 · Materiales del profesor por día
+
+- **Descripción:** el portal muestra por día los **materiales del profesor**
+  (PDF, presentaciones, imágenes, enlaces), con textos pre-escritos opcionales
+  (introducción, resumen, preguntas guía).
+- **Criterios de aceptación:**
+  - Cada material se muestra como enlace/botón titulado que abre en pestaña nueva
+    (`rel=noopener`) para PDF/slides/enlaces, y como `<img>` inline para imágenes.
+  - Los textos (intro / resumen / preguntas) son **pre-escritos**; no se genera
+    contenido en tiempo de ejecución (ver
+    [RNF-011](no-funcionales.md#rnf-011--sin-ia-en-tiempo-de-ejecución-contenido-pre-escrito)).
+  - No hay subida de archivos desde la plataforma (ver
+    [RF-021](#rf-021--materiales-como-archivos-estáticos-versionados--manifest)).
+- **Estado:** aprobado (materiales aún sin construir).
+- **Origen:** [CC-006](../cambios/CC-006-materiales-profesor.md) /
+  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md). Archivos
+  **previstos** (aún no creados): `frontend/src/content/materials.ts` (manifest),
+  un componente `MaterialsList` en `frontend/src/ui.tsx` y su inserción en la
+  vista del día.
+
+## RF-021 · Materiales como archivos estáticos versionados + manifest
+
+- **Descripción:** los materiales son **archivos estáticos** bajo
+  `frontend/public/materials/day-NN/`, servidos por el `express.static` ya
+  existente en `/materials/…`, y declarados en un **manifest tipado**. **No** hay
+  subida desde la plataforma (la Opción A se descartó por el costo de
+  storage/validación con Replit KV; ver
+  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md)).
+- **Criterios de aceptación:**
+  - Un archivo en `frontend/public/materials/day-NN/` queda accesible en
+    `/materials/day-NN/…` tras el build (Vite copia `public/` a `dist/`; el
+    fallback SPA excluye solo `/api`).
+  - El manifest (`frontend/src/content/materials.ts`) es la **única fuente de
+    verdad** de qué material existe por día (un host estático no lista
+    directorios).
+  - No se usa Replit KV para binarios ni se añade endpoint de subida.
+- **Estado:** aprobado (materiales aún sin construir).
+- **Origen:** [CC-006](../cambios/CC-006-materiales-profesor.md) /
+  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md); se apoya en
+  `backend/src/index.ts:20-25` (`express.static` + fallback SPA que excluye
+  `/api`). Archivos **previstos:** `frontend/public/materials/…` y
+  `frontend/src/content/materials.ts`.

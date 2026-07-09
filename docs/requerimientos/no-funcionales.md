@@ -13,6 +13,10 @@ actualizan al final del documento. Las **Fuente** de los RNF de línea base se
 ajustaron a las líneas actuales del código reorganizado. Convenciones:
 [README.md](README.md).
 
+**Actualización 2026-07-09 ([CC-005](../cambios/CC-005-dia3-github-onboarding.md), [CC-006](../cambios/CC-006-materiales-profesor.md)):**
+el Día 3 (guía) y los materiales del profesor formalizan una cualidad que ya era
+decisión del equipo: **sin IA en tiempo de ejecución**. Se añade **RNF-011**.
+
 ---
 
 ## RNF-001 · Simplicidad del stack
@@ -178,6 +182,34 @@ ajustaron a las líneas actuales del código reorganizado. Convenciones:
   `backend/src/routes/admin.ts:24-35,40-47,52-59,64-70,75-81,89-118,126-145,153-163,168-174,179-186,191-198`
   (try/catch en cada ruta de admin), `backend/src/db.ts:3-5` (cliente único;
   el fallo fuera de Replit es esperado y se maneja arriba).
+
+---
+
+## RNF-011 · Sin IA en tiempo de ejecución (contenido pre-escrito)
+
+- **Descripción:** la app **no** usa IA en tiempo de ejecución. Todo el contenido
+  que ve el alumno (la guía del Día 3 y los materiales del profesor) es texto
+  **pre-escrito**, autorado en desarrollo (con o sin ayuda de IA); ningún
+  componente genera texto ni llama a un servicio de IA en runtime. Formaliza la
+  decisión deliberada de no integrar IA registrada en `CLAUDE.md`.
+- **Criterios de aceptación:**
+  - No hay dependencias de SDK de IA en `frontend/package.json` ni
+    `backend/package.json`.
+  - El contenido de las guías vive como datos pre-escritos
+    (`frontend/src/content/days.ts`); los materiales, al implementarse, como texto
+    en el manifest (ver [RF-020](funcionales.md#rf-020--materiales-del-profesor-por-día)).
+    Nada se genera al vuelo.
+  - Los diagramas son SVG inline o imágenes autoradas, no render de
+    Markdown/Mermaid en el cliente.
+- **Estado:** implementado (la cualidad se cumple hoy: la guía del Día 3 es
+  contenido pre-escrito y no hay IA en el código; los materiales heredarán la
+  misma regla al construirse).
+- **Fuente:** `frontend/src/content/days.ts` (contenido pre-escrito), ausencia de
+  dependencias de IA en `frontend/package.json` y `backend/package.json`,
+  `CLAUDE.md` ("No AI (deliberate)"). Origen:
+  [CC-005](../cambios/CC-005-dia3-github-onboarding.md) /
+  [CC-006](../cambios/CC-006-materiales-profesor.md) /
+  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md).
 
 ---
 

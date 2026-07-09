@@ -64,8 +64,9 @@ Además, esta es la forma más barata de **empezar a pagar** la deuda de
     al backend).
 - **Datos:** ninguno. No toca el KV ni requiere migración.
 - **Docs:** este CC-005; [ADR-0005](../decisiones/0005-guias-como-datos.md);
-  nota de avance parcial en [roadmap.md](../roadmap.md). **Pendiente:** formalizar
-  RF-018/RF-019 en `docs/requerimientos/`.
+  nota de avance parcial en [roadmap.md](../roadmap.md). RF-018/RF-019
+  formalizados en [funcionales.md](../requerimientos/funcionales.md) y RF-010
+  actualizado (tercera pestaña).
 - **Esfuerzo y riesgo:** bajo. Solo frontend, sin dependencias nuevas
   (visuales con SVG inline + emoji + CSS; **nada** de Mermaid/react-markdown/
   marked). El typecheck atrapa el efecto dominó de ampliar `View`.

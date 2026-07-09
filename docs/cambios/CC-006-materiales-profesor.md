@@ -61,8 +61,10 @@ existe.
   - `frontend/src/styles.css` — estilos de la lista de materiales.
 - **Datos:** ninguno. No toca el KV.
 - **Docs:** este CC-006;
-  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md). **Pendiente:**
-  formalizar RF-020/RF-021/RNF-011 en `docs/requerimientos/`.
+  [ADR-0006](../decisiones/0006-materiales-estaticos-sin-upload.md). RF-020/RF-021
+  (estado `aprobado`) y RNF-011 formalizados en
+  [funcionales.md](../requerimientos/funcionales.md) y
+  [no-funcionales.md](../requerimientos/no-funcionales.md).
 - **Esfuerzo y riesgo:** bajo. Sin backend ni dependencias nuevas. Riesgos: los
   materiales quedan **públicos** en `/materials/...` (sin passcode); los binarios
   versionados inflan el repo (mantener pocos y livianos); agregar material exige
