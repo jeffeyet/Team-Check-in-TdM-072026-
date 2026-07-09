@@ -65,7 +65,17 @@ equipo; ver [cambios/registro.md](cambios/registro.md).
 
 - **Actividades como datos:** generalizar el Día 1 / Día 2 a actividades
   configurables (tipo, título, ventana), para no programar una ruta y una vista
-  por cada actividad nueva. Es la limitación de línea base que sigue vigente.
+  por cada actividad nueva. La **mitad read-only** (guías) avanza con
+  [CC-005](cambios/CC-005-dia3-github-onboarding.md) /
+  [ADR-0005](decisiones/0005-guias-como-datos.md): los días se modelan como datos
+  y las guías (Día 3) se pintan con un componente genérico. La mitad
+  **`kind:"form"`** (los formularios que escriben, Día 1 / Día 2) sigue siendo
+  la limitación de línea base vigente.
+- **Materiales del profesor por día:** mostrar PDF/presentaciones/enlaces por día
+  desde archivos estáticos + manifest tipado
+  ([CC-006](cambios/CC-006-materiales-profesor.md) /
+  [ADR-0006](decisiones/0006-materiales-estaticos-sin-upload.md)), sin subida
+  desde la plataforma y sin IA en runtime.
 - **Sin IA por ahora:** decisión deliberada del equipo; se retomaría solo con
   una idea realmente creativa.
 

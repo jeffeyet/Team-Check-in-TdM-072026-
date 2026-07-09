@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { View, Cohort } from "../types";
+import type { View, DayId, Cohort } from "../types";
 import { Header, DayTabs, ConfirmScreen } from "../ui";
 import { submitTeam } from "../api";
 
@@ -27,7 +27,7 @@ export default function Day1({
   cohort,
 }: {
   view: View;
-  onSelectDay: (v: "day1" | "day2") => void;
+  onSelectDay: (v: DayId) => void;
   onSwitch: () => void;
   cohort: Cohort;
 }) {

@@ -87,9 +87,45 @@ textarea{resize:vertical;min-height:64px}
 .empty{text-align:center;color:var(--muted);padding:48px 20px}
 .empty h2{font-family:'Space Grotesk',sans-serif;color:var(--ink);margin:0 0 6px}
 .foot{margin-top:22px;font-size:12px;color:var(--muted);text-align:center}
+/* guide days (Day 3 GitHub onboarding, read-only) */
+.card.guide{padding:24px 22px}
+.g-intro{margin:0 0 10px;color:var(--ink-2);font-size:15px}
+.g-h{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:22px 0 10px;color:var(--ink)}
+.g-concepts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 4px}
+.g-concept{display:flex;gap:10px;align-items:flex-start;background:#fffdf8;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+.g-emoji{font-size:20px;line-height:1.2}
+.g-term{font-weight:600;font-size:14px;color:var(--ink)}
+.g-desc{font-size:13px;color:var(--muted);margin-top:2px}
+.g-diagram{border:1px solid var(--line);border-radius:12px;background:#fffdf8;padding:12px 10px;margin:2px 0 4px;overflow-x:auto}
+.g-diagram svg{color:var(--ink-2);display:block;min-width:520px}
+.g-diagram svg text{font-family:'Inter',system-ui,sans-serif}
+.gc-box{fill:#fff;stroke:var(--line);stroke-width:1.5}
+.gc-label{fill:var(--ink);font:600 15px 'Space Grotesk',sans-serif}
+.gc-sub{fill:var(--muted);font-size:11px}
+.gc-line{stroke:currentColor;stroke-width:2;fill:none}
+.gc-line-gold{stroke:var(--gold-deep);stroke-width:2.5;fill:none}
+.gc-edge{fill:currentColor;font-size:12px;font-weight:600}
+.gc-gold-fill{fill:var(--gold-deep)}
+.gc-flowhead{fill:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.gc-pill{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.gc-pilltext{fill:var(--ink-2);font-size:12.5px;font-weight:600}
+.g-steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:7px;font-size:14px;color:var(--ink-2)}
+.g-copy{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.g-msg{flex:1;min-width:200px;background:var(--ink);color:#fff;padding:10px 12px;border-radius:9px;font-size:13px;overflow-x:auto;white-space:nowrap}
+.g-kitbtn{margin-top:12px;text-decoration:none}
+.g-tablewrap{overflow-x:auto;margin-top:4px}
+.g-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.g-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-deep);padding:8px 10px;border-bottom:2px solid var(--line)}
+.g-table td{padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+.g-table td:first-child{border-right:1px solid var(--line)}
+.g-check{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.g-check li{position:relative;padding-left:26px;font-size:14px;color:var(--ink-2)}
+.g-check li::before{content:"✓";position:absolute;left:0;top:0;color:var(--go);font-weight:700}
+.g-trouble{margin:20px 0 0;font-size:13px;color:var(--muted);border-left:3px solid var(--gold);padding:4px 0 4px 12px}
 @media (max-width:560px){
   .brand h1{font-size:21px}
   .mrow{grid-template-columns:1fr auto;gap:8px}
   .mrow input[type=url]{grid-column:1 / -1}
   .pmbox{grid-column:1 / 2}
+  .g-concepts{grid-template-columns:1fr}
 }

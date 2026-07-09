@@ -14,6 +14,8 @@ edita: se reemplaza con un ADR nuevo, y el anterior se marca como
 | [0002](0002-evolucion-replit-nativa.md) | Evolucionar la app existente, Replit-nativa | reemplazada por 0003 |
 | [0003](0003-stack-moderno-typescript-react.md) | Stack moderno: TypeScript + Express y React + Vite | aceptada |
 | [0004](0004-aislamiento-por-cohorte.md) | Aislamiento por cohorte sobre Replit KV | aceptada |
+| [0005](0005-guias-como-datos.md) | Guías (contenido read-only) como datos | aceptada |
+| [0006](0006-materiales-estaticos-sin-upload.md) | Materiales del profesor: archivos estáticos + manifest, sin subida ni IA en runtime | propuesta |
 
 ## Cuándo escribir un ADR
 

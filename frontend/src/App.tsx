@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import type { View, AdminTab, Cohort } from "./types";
+import type { View, DayId, AdminTab, Cohort } from "./types";
 import { getCohort } from "./api";
 import { GroupGate, LoadingScreen } from "./ui";
 import Day1 from "./views/Day1";
 import Day2 from "./views/Day2";
+import Guide from "./views/Guide";
 import Admin from "./views/Admin";
 
 type CohortState = "loading" | "ok" | "missing";
@@ -64,7 +65,7 @@ export default function App() {
 
   // The header switch toggles between instructor view and the day-2 form.
   const onSwitch = () => setView(view === "admin" ? "day2" : "admin");
-  const onSelectDay = (v: "day1" | "day2") => setView(v);
+  const onSelectDay = (v: DayId) => setView(v);
 
   if (view === "admin") {
     return (
@@ -99,6 +100,16 @@ export default function App() {
   if (view === "day1") {
     return (
       <Day1
+        view={view}
+        onSelectDay={onSelectDay}
+        onSwitch={onSwitch}
+        cohort={cohort}
+      />
+    );
+  }
+  if (view === "day3") {
+    return (
+      <Guide
         view={view}
         onSelectDay={onSelectDay}
         onSwitch={onSwitch}

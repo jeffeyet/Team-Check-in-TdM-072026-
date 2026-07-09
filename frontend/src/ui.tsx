@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import type { View } from "./types";
+import type { View, DayId } from "./types";
+import { DAYS } from "./content/days";
 
 // Enter/Space activates a non-button element acting as a control.
 function keyActivate(fn: () => void) {
@@ -49,32 +50,27 @@ export function DayTabs({
   onSelect,
 }: {
   view: View;
-  onSelect: (v: "day1" | "day2") => void;
+  onSelect: (v: DayId) => void;
 }) {
+  // Tabs are rendered from the day catalog (content/days.ts); adding a day is a
+  // data edit, not a new tab here (ADR-0005).
   return (
     <div className="daytabs" role="tablist">
-      <div
-        className={"daytab " + (view === "day1" ? "active" : "")}
-        id="tab-day1"
-        role="tab"
-        tabIndex={0}
-        aria-selected={view === "day1"}
-        onClick={() => onSelect("day1")}
-        onKeyDown={keyActivate(() => onSelect("day1"))}
-      >
-        <span className="d">Monday</span>Team Check-In
-      </div>
-      <div
-        className={"daytab " + (view === "day2" ? "active" : "")}
-        id="tab-day2"
-        role="tab"
-        tabIndex={0}
-        aria-selected={view === "day2"}
-        onClick={() => onSelect("day2")}
-        onKeyDown={keyActivate(() => onSelect("day2"))}
-      >
-        <span className="d">Tuesday</span>Prompt Log
-      </div>
+      {DAYS.map((d) => (
+        <div
+          className={"daytab " + (view === d.id ? "active" : "")}
+          id={"tab-" + d.id}
+          role="tab"
+          tabIndex={0}
+          key={d.id}
+          aria-selected={view === d.id}
+          onClick={() => onSelect(d.id)}
+          onKeyDown={keyActivate(() => onSelect(d.id))}
+        >
+          <span className="d">{d.dayLabel}</span>
+          {d.tabLabel}
+        </div>
+      ))}
     </div>
   );
 }
