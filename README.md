@@ -37,6 +37,8 @@ public/index.html   Entire UI: styles, markup, and client JS in one file
 package.json        Dependencies and `npm start` script
 replit              Replit run/deploy config (NOTE: missing its leading dot — inactive as-is)
 gitignore           Ignore rules (NOTE: missing its leading dot — inactive as-is)
+checkin-platform/   Scaling plan: multi-class platform with separate front/back
+                    (planning docs in Spanish + dev skeleton) — see its README.md
 CLAUDE.md           Context file for Claude Code sessions
 ```
 
@@ -90,3 +92,5 @@ the JSON body.
 - All team work happens on **`Solanum_Branch`** — never commit directly to `main`.
 - Read [`CLAUDE.md`](CLAUDE.md) (Claude Code loads it automatically) before
   making changes with an AI pair.
+- Scaling plan (multi-class platform):
+  [`checkin-platform/`](checkin-platform/README.md).

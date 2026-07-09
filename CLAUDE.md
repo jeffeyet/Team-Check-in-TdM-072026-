@@ -38,6 +38,14 @@ instructor dashboard. Storage is the Replit key-value DB (`team:*` and
 4. The UI is a tiny hand-rolled SPA in one `<script>`: `view` switches between
    `day1`/`day2`/`admin` and `render()` re-draws. It defaults to `day2`.
 
+## Scaling plan
+
+`checkin-platform/` holds the plan (Spanish docs + empty dev skeleton) to grow
+this into a multi-class platform with separate frontend and backend. Planning
+phase (F0): stack choices there are proposals until the team confirms them in
+an ADR. The app at the repo root stays untouched and keeps serving the July
+2026 edition.
+
 ## Style
 
 - Plain CommonJS (`require`), no TypeScript, no bundler, no new frameworks.
