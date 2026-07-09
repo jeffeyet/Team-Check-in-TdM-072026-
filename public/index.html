@@ -10,6 +10,33 @@
     --gold:#e8a723; --gold-deep:#b47c0e; --go:#1f8a5b; --muted:#5d6b76; --danger:#b23b3b;
     --radius:14px; --shadow:0 1px 2px rgba(0,36,63,.06), 0 12px 32px rgba(0,36,63,.08);
   }
+  /* ===== DARK MODE (added by matiaslopera) ===== */
+  [data-theme="dark"]{
+    --ink:#e8e4dc; --ink-2:#c9c3b8; --paper:#141820; --card:#1c2028; --line:#2e3440;
+    --gold:#f0b840; --gold-deep:#e8a723; --go:#3ddc84; --muted:#8a95a5; --danger:#e05555;
+    --shadow:0 1px 2px rgba(0,0,0,.20), 0 12px 32px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] body{
+    background:radial-gradient(1200px 500px at 80% -10%, rgba(232,167,35,.06), transparent 60%), var(--paper);
+  }
+  [data-theme="dark"] input[type=text],
+  [data-theme="dark"] input[type=url],
+  [data-theme="dark"] textarea{background:var(--card);color:var(--ink);border-color:var(--line)}
+  [data-theme="dark"] .mrow{background:var(--card);border-color:var(--line)}
+  [data-theme="dark"] .mrow input{background:#242830}
+  [data-theme="dark"] .daytab{background:var(--card);border-color:var(--line)}
+  [data-theme="dark"] .daytab.active{background:var(--gold);color:#141820}
+  [data-theme="dark"] .daytab.active .d{color:#3a2800}
+  [data-theme="dark"] .team-tag{background:var(--gold);color:#141820}
+  /* toggle button */
+  .theme-toggle{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:16px;line-height:1;transition:border-color .15s}
+  .theme-toggle:hover{border-color:var(--gold)}
+  /* ===== END DARK MODE ===== */
+  /* ===== TEAM AVATARS (added by matiaslopera) ===== */
+  .team-avatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;color:#fff;flex-shrink:0;text-transform:uppercase;letter-spacing:.02em;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .team-avatar.lg{width:64px;height:64px;border-radius:16px;font-size:24px;margin:0 auto 14px}
+  .roster .member-avatar{width:28px;height:28px;border-radius:8px;font-size:11px}
+  /* ===== END TEAM AVATARS ===== */
   *{box-sizing:border-box} html,body{margin:0}
   body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     background:radial-gradient(1200px 500px at 80% -10%, rgba(232,167,35,.10), transparent 60%), var(--paper);
@@ -93,6 +120,7 @@
   .empty{text-align:center;color:var(--muted);padding:48px 20px}
   .empty h2{font-family:'Space Grotesk',sans-serif;color:var(--ink);margin:0 0 6px}
   .foot{margin-top:22px;font-size:12px;color:var(--muted);text-align:center}
+  .header-actions{display:flex;align-items:center;gap:8px}
   @media (max-width:560px){
     .brand h1{font-size:21px}
     .mrow{grid-template-columns:1fr auto;gap:8px}
@@ -106,6 +134,53 @@
 <div id="app"></div>
 
 <script>
+/* ===== DARK MODE TOGGLE (added by matiaslopera) ===== */
+function initTheme(){
+  const saved = localStorage.getItem('theme');
+  if(saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)){
+    document.documentElement.setAttribute('data-theme','dark');
+  }
+}
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  // update all toggle button icons on page
+  document.querySelectorAll('.theme-toggle').forEach(btn => btn.textContent = next === 'dark' ? '☀️' : '🌙');
+}
+function themeIcon(){ return document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; }
+initTheme();
+/* ===== END DARK MODE TOGGLE ===== */
+
+/* ===== TEAM AVATAR GENERATOR (added by matiaslopera) ===== */
+function hashStr(s){
+  let h=0; for(let i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0; return Math.abs(h);
+}
+function teamInitials(name){
+  const words=name.trim().split(/\s+/);
+  if(words.length===1) return words[0].slice(0,2);
+  return (words[0][0]+words[1][0]);
+}
+function avatarHTML(name, cls){
+  const h=hashStr(name.toLowerCase());
+  const hue1=h%360, hue2=(hue1+40)%360;
+  const sat=55+h%20, light=42+h%15;
+  const bg=`linear-gradient(135deg, hsl(${hue1},${sat}%,${light}%) 0%, hsl(${hue2},${sat}%,${light+8}%) 100%)`;
+  const ini=teamInitials(name);
+  return `<div class="team-avatar ${cls||''}" style="background:${bg}" title="${esc(name)}">${esc(ini)}</div>`;
+}
+function memberAvatarHTML(name){
+  const h=hashStr(name.toLowerCase());
+  const hue1=h%360, hue2=(hue1+30)%360;
+  const sat=50+h%20, light=45+h%12;
+  const bg=`linear-gradient(135deg, hsl(${hue1},${sat}%,${light}%) 0%, hsl(${hue2},${sat}%,${light+6}%) 100%)`;
+  const ini=name.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2);
+  return `<div class="team-avatar member-avatar" style="background:${bg}">${esc(ini)}</div>`;
+}
+/* ===== END TEAM AVATAR GENERATOR ===== */
+
+
 const MAX_MEMBERS = 6;
 const $ = (s, el=document) => el.querySelector(s);
 const app = document.getElementById('app');
@@ -125,7 +200,10 @@ function header(sub){
       <h1>Course Portal</h1>
       <p>${sub}</p>
     </div>
-    <button class="viewlink" id="switch">${view==='admin'?'&larr; Back':'Instructor view &rarr;'}</button>
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-btn" title="Toggle dark mode">${themeIcon()}</button>
+      <button class="viewlink" id="switch">${view==='admin'?'&larr; Back':'Instructor view &rarr;'}</button>
+    </div>
   </header>`;
 }
 function dayTabs(){
@@ -139,6 +217,7 @@ function wireDayTabs(){
   if(a) a.onclick=()=>{ view='day1'; render(); };
   if(b) b.onclick=()=>{ view='day2'; render(); };
   $('#switch').onclick=()=>{ view='admin'; render(); };
+  const tb=$('#theme-btn'); if(tb) tb.onclick=toggleTheme;
 }
 
 /* ===================== DAY 1: TEAM CHECK-IN ===================== */
@@ -208,7 +287,7 @@ async function submitDay1(){
   try{
     const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teamName,members,idea})});
     if(!r.ok) throw new Error();
-    confirmScreen(esc(teamName)+' is checked in.', members.length+' member(s) on the board.', renderDay1, 'Submit another team');
+    confirmScreen(esc(teamName)+' is checked in.', members.length+' member(s) on the board.', renderDay1, 'Submit another team', teamName);
   }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Check in our team'; }
 }
 
@@ -256,22 +335,23 @@ async function submitDay2(){
   try{
     const r=await fetch('/api/prompt-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teamName,idea,docUrl})});
     if(!r.ok) throw new Error();
-    confirmScreen(esc(teamName)+' is in.', 'Your prompt log and revised idea are submitted.', renderDay2, 'Submit another');
+    confirmScreen(esc(teamName)+' is in.', 'Your prompt log and revised idea are submitted.', renderDay2, 'Submit another', teamName);
   }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Submit my prompt log'; }
 }
 
 /* ===================== shared confirmation ===================== */
-function confirmScreen(title, sub, againFn, againLabel){
+function confirmScreen(title, sub, againFn, againLabel, teamName){
   app.innerHTML='';
   const wrap=document.createElement('div'); wrap.className='wrap';
   wrap.innerHTML = header('') + `
     <div class="card confirm">
-      <div class="check">&check;</div>
+      ${teamName ? avatarHTML(teamName,'lg') : '<div class="check">&check;</div>'}
       <h2>${title}</h2><p>${sub}</p>
       <div class="row"><button class="btn btn-ghost btn-sm" id="again">${againLabel}</button></div>
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='admin'; render(); };
+  const tb=$('#theme-btn'); if(tb) tb.onclick=toggleTheme;
   $('#again').onclick=againFn;
 }
 
@@ -288,6 +368,7 @@ function renderGate(){
     </div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
+  const tb=$('#theme-btn'); if(tb) tb.onclick=toggleTheme;
   const go=async()=>{
     const code=$('#f-code').value.trim(); const m=$('#gmsg'); m.className='msg';
     try{
@@ -312,6 +393,7 @@ async function renderAdmin(){
     <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
   app.appendChild(wrap);
   $('#switch').onclick=()=>{ view='day2'; render(); };
+  const tb=$('#theme-btn'); if(tb) tb.onclick=toggleTheme;
   $('#at-teams').onclick=()=>{ adminTab='teams'; renderAdmin(); };
   $('#at-prompts').onclick=()=>{ adminTab='prompts'; renderAdmin(); };
   if(adminTab==='teams') await renderTeamsTab();
@@ -334,9 +416,9 @@ async function renderTeamsTab(){
       <button class="btn btn-ghost btn-sm" id="clear" style="color:var(--danger);border-color:#e7cccc">Clear teams</button></div>`;
   for(const t of teams){
     const mem=t.members||[];
-    html+=`<div class="team"><div class="team-head"><span class="team-tag mono">${esc(t.teamName)}</span><span class="team-count">${mem.length} member(s)</span></div>
+    html+=`<div class="team"><div class="team-head">${avatarHTML(t.teamName)}<span class="team-tag mono">${esc(t.teamName)}</span><span class="team-count">${mem.length} member(s)</span></div>
       <div class="idea ${t.idea?'':'none'}">${t.idea?esc(t.idea):'No idea submitted'}</div>
-      <ul class="roster">${mem.map(m=>`<li><span>${esc(m.name)}</span>${m.isPM?'<span class="pm-badge">First PM</span>':''}${m.linkedin?`<a href="${esc(m.linkedin)}" target="_blank" rel="noopener">LinkedIn &#8599;</a>`:'<span class="noln">no LinkedIn</span>'}</li>`).join('')}</ul></div>`;
+      <ul class="roster">${mem.map(m=>`<li>${memberAvatarHTML(m.name)}<span>${esc(m.name)}</span>${m.isPM?'<span class="pm-badge">First PM</span>':''}${m.linkedin?`<a href="${esc(m.linkedin)}" target="_blank" rel="noopener">LinkedIn &#8599;</a>`:'<span class="noln">no LinkedIn</span>'}</li>`).join('')}</ul></div>`;
   }
   content.innerHTML=html;
   $('#refresh').onclick=renderAdmin;
@@ -362,7 +444,7 @@ async function renderPromptsTab(){
       <button class="btn btn-ghost btn-sm" id="clear" style="color:var(--danger);border-color:#e7cccc">Clear logs</button></div>`;
   for(const k of keys){
     const g=groups[k];
-    html+=`<div class="team"><div class="team-head"><span class="team-tag mono">${esc(g.label)}</span><span class="team-count">${g.items.length} submission(s)</span></div>
+    html+=`<div class="team"><div class="team-head">${avatarHTML(g.label)}<span class="team-tag mono">${esc(g.label)}</span><span class="team-count">${g.items.length} submission(s)</span></div>
       <ul class="roster">${g.items.map(l=>`<li>
           <span class="idea" style="margin:0;border:none;padding:0;font-size:14px">${esc(l.idea||'')}</span>
           ${l.docUrl?`<a class="doclink" href="${esc(l.docUrl)}" target="_blank" rel="noopener">Open prompts &#8599;</a>`:'<span class="noln">no link</span>'}
