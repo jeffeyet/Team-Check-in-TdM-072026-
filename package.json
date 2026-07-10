@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "AI Leadership Intensive - team check-in portal",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --check index.js"
+  },
   "dependencies": {
     "express": "^4.19.2",
-    "@replit/database": "^2.0.1"
+    "pg": "^8.13.1"
   }
 }

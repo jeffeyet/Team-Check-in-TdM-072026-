@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Leadership Intensive — Portal</title>
+<title>AI Leadership Intensive &mdash; Portal</title>
 
 <style>
   :root{
@@ -109,14 +109,30 @@
 const MAX_MEMBERS = 6;
 const $ = (s, el=document) => el.querySelector(s);
 const app = document.getElementById('app');
-let view = 'day2';          // 'day1' | 'day2' | 'admin'  (defaults to today: Tuesday)
+let view = 'day2';          // 'day1' | 'day2' | 'admin'
 let unlocked = false;
 let adminCode = '';
 let adminTab = 'prompts';   // 'teams' | 'prompts'
 let lastTeams = [];
 let lastLogs = [];
 
+function adminHeaders(){ return {'x-admin-passcode':adminCode}; }
+async function downloadAdminCsv(url, filename){
+  const r=await fetch(url,{headers:adminHeaders()});
+  if(!r.ok) throw new Error('Export failed.');
+  const blob=await r.blob();
+  const href=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=href; a.download=filename; a.click();
+  URL.revokeObjectURL(href);
+}
+
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function isGoogleDocUrl(raw){
+  try{
+    const u = new URL(String(raw || '').trim());
+    return u.protocol === 'https:' && u.hostname === 'docs.google.com' && /^\/document\/d\/[^/]+/.test(u.pathname);
+  }catch(e){ return false; }
+}
 
 function header(sub){
   return `<header>
@@ -131,7 +147,7 @@ function header(sub){
 function dayTabs(){
   return `<div class="daytabs">
     <div class="daytab ${view==='day1'?'active':''}" id="tab-day1"><span class="d">Monday</span>Team Check-In</div>
-    <div class="daytab ${view==='day2'?'active':''}" id="tab-day2"><span class="d">Tuesday</span>Prompt Log</div>
+    <div class="daytab ${view==='day2'?'active':''}" id="tab-day2"><span class="d">Tuesday</span>Updated Idea</div>
   </div>`;
 }
 function wireDayTabs(){
@@ -212,11 +228,11 @@ async function submitDay1(){
   }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Check in our team'; }
 }
 
-/* ===================== DAY 2: PROMPT LOG ===================== */
+/* ===================== DAY 2: UPDATED IDEA ===================== */
 async function renderDay2(){
   app.className=''; app.innerHTML='';
   const wrap=document.createElement('div'); wrap.className='wrap';
-  wrap.innerHTML = header('Log your 20-prompt session and your revised idea.') + dayTabs() + `
+  wrap.innerHTML = header('Submit your revised business idea and the Google Doc behind it.') + dayTabs() + `
     <div class="card">
       <div class="field">
         <label class="lab" for="p-team">Team name <span class="req">*</span></label>
@@ -224,16 +240,16 @@ async function renderDay2(){
         <datalist id="teamlist"></datalist>
       </div>
       <div class="field">
-        <label class="lab" for="p-doc">Google Doc link &mdash; your 20 prompts <span class="req">*</span></label>
+        <label class="lab" for="p-doc">Google Doc link <span class="req">*</span></label>
         <input type="url" id="p-doc" placeholder="https://docs.google.com/document/d/...">
         <div class="countrow"><span class="count">Set sharing to &ldquo;Anyone with the link can view&rdquo; so the instructor can open it.</span></div>
       </div>
       <div class="field">
-        <label class="lab" for="p-idea">Your revised idea, in one sentence <span class="req">*</span><span class="hint">how it changed after 20 prompts</span></label>
+        <label class="lab" for="p-idea">Your revised idea, in one sentence <span class="req">*</span><span class="hint">how it changed since Monday</span></label>
         <textarea id="p-idea" maxlength="240" placeholder="Now: a quiz tool that also flags which topics you got wrong most."></textarea>
         <div class="countrow"><span class="count" id="pcount">0 / 240</span><span class="count">one thing, done well</span></div>
       </div>
-      <button class="btn btn-primary" id="psubmit">Submit my prompt log</button>
+      <button class="btn btn-primary" id="psubmit">Submit our updated idea</button>
       <div class="msg" id="pmsg"></div>
     </div>
     <div class="foot">Shared with the instructor for review.</div>`;
@@ -251,13 +267,17 @@ async function submitDay2(){
   const docUrl=$('#p-doc').value.trim(); const idea=$('#p-idea').value.trim();
   if(!teamName){ msg.classList.add('err'); msg.textContent='Please add your team name.'; return; }
   if(!docUrl){ msg.classList.add('err'); msg.textContent='Paste your Google Doc link.'; return; }
+  if(!isGoogleDocUrl(docUrl)){ msg.classList.add('err'); msg.textContent='Use a Google Docs link that starts with https://docs.google.com/document/d/.'; return; }
   if(!idea){ msg.classList.add('err'); msg.textContent='Add your revised one-sentence idea.'; return; }
   const btn=$('#psubmit'); btn.disabled=true; btn.textContent='Submitting...';
   try{
     const r=await fetch('/api/prompt-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({teamName,idea,docUrl})});
-    if(!r.ok) throw new Error();
-    confirmScreen(esc(teamName)+' is in.', 'Your prompt log and revised idea are submitted.', renderDay2, 'Submit another');
-  }catch(e){ msg.classList.add('err'); msg.textContent='Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Submit my prompt log'; }
+    if(!r.ok){
+      const d=await r.json().catch(()=>({}));
+      throw new Error(d.error || 'Something went wrong. Try once more.');
+    }
+    confirmScreen(esc(teamName)+' is in.', 'Your updated idea and Google Doc are submitted.', renderDay2, 'Submit another');
+  }catch(e){ msg.classList.add('err'); msg.textContent=e.message || 'Something went wrong. Try once more.'; btn.disabled=false; btn.textContent='Submit our updated idea'; }
 }
 
 /* ===================== shared confirmation ===================== */
@@ -291,9 +311,10 @@ function renderGate(){
   const go=async()=>{
     const code=$('#f-code').value.trim(); const m=$('#gmsg'); m.className='msg';
     try{
-      const r=await fetch('/api/prompt-roster?code='+encodeURIComponent(code));
+      const r=await fetch('/api/auth-check',{headers:{'x-admin-passcode':code}});
       if(r.status===401){ m.classList.add('err'); m.textContent='That passcode did not match.'; return; }
-      const d=await r.json(); adminCode=code; unlocked=true; lastLogs=d.logs||[];
+      if(!r.ok){ m.classList.add('err'); m.textContent='Could not verify the passcode.'; return; }
+      adminCode=code; unlocked=true; lastLogs=[];
       renderAdmin();
     }catch(e){ m.classList.add('err'); m.textContent='Could not reach the server.'; }
   };
@@ -307,7 +328,7 @@ async function renderAdmin(){
   wrap.innerHTML = header('Live submissions.') + `
     <div class="tabbar">
       <div class="tab ${adminTab==='teams'?'active':''}" id="at-teams">Teams (Mon)</div>
-      <div class="tab ${adminTab==='prompts'?'active':''}" id="at-prompts">Prompt logs (Tue)</div>
+      <div class="tab ${adminTab==='prompts'?'active':''}" id="at-prompts">Updated ideas (Tue)</div>
     </div>
     <div id="content"><div class="empty"><h2>Loading...</h2></div></div>`;
   app.appendChild(wrap);
@@ -319,7 +340,7 @@ async function renderAdmin(){
 }
 
 async function renderTeamsTab(){
-  try{ const r=await fetch('/api/roster?code='+encodeURIComponent(adminCode)); const d=await r.json(); lastTeams=d.teams||[]; }catch(e){ lastTeams=[]; }
+  try{ const r=await fetch('/api/roster',{headers:adminHeaders()}); const d=await r.json(); lastTeams=d.teams||[]; }catch(e){ lastTeams=[]; }
   const teams=lastTeams; const content=$('#content');
   if(teams.length===0){ content.innerHTML=`<div class="empty"><h2>No team check-ins yet</h2><button class="btn btn-ghost btn-sm" id="refresh" style="margin-top:12px">Refresh</button></div>`; $('#refresh').onclick=renderAdmin; return; }
   const students=teams.reduce((s,t)=>s+(t.members?t.members.length:0),0);
@@ -330,8 +351,7 @@ async function renderTeamsTab(){
       <div class="stat"><div class="n">${pms}</div><div class="l">PMs named</div></div>
     </div>
     <div class="toolbar"><button class="btn btn-ghost btn-sm" id="refresh">&#8635; Refresh</button>
-      <button class="btn btn-ghost btn-sm" id="csv">Export CSV</button><span class="spacer"></span>
-      <button class="btn btn-ghost btn-sm" id="clear" style="color:var(--danger);border-color:#e7cccc">Clear teams</button></div>`;
+      <button class="btn btn-ghost btn-sm" id="csv">Export CSV</button><span class="spacer"></span></div>`;
   for(const t of teams){
     const mem=t.members||[];
     html+=`<div class="team"><div class="team-head"><span class="team-tag mono">${esc(t.teamName)}</span><span class="team-count">${mem.length} member(s)</span></div>
@@ -340,14 +360,13 @@ async function renderTeamsTab(){
   }
   content.innerHTML=html;
   $('#refresh').onclick=renderAdmin;
-  $('#csv').onclick=()=>{ window.location='/api/export.csv?code='+encodeURIComponent(adminCode); };
-  $('#clear').onclick=async()=>{ if(!confirm('Delete every team check-in?')) return; await fetch('/api/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:adminCode})}); renderAdmin(); };
+  $('#csv').onclick=()=>downloadAdminCsv('/api/export.csv','team-checkins.csv').catch(()=>alert('Export failed.'));
 }
 
 async function renderPromptsTab(){
-  try{ const r=await fetch('/api/prompt-roster?code='+encodeURIComponent(adminCode)); const d=await r.json(); lastLogs=d.logs||[]; }catch(e){ lastLogs=[]; }
+  try{ const r=await fetch('/api/prompt-roster',{headers:adminHeaders()}); const d=await r.json(); lastLogs=d.logs||[]; }catch(e){ lastLogs=[]; }
   const logs=lastLogs; const content=$('#content');
-  if(logs.length===0){ content.innerHTML=`<div class="empty"><h2>No prompt logs yet</h2><p>Submissions will appear here as students share their Google Doc links.</p><button class="btn btn-ghost btn-sm" id="refresh" style="margin-top:12px">Refresh</button></div>`; $('#refresh').onclick=renderAdmin; return; }
+  if(logs.length===0){ content.innerHTML=`<div class="empty"><h2>No updated ideas yet</h2><p>Submissions will appear here as students share their Google Doc links.</p><button class="btn btn-ghost btn-sm" id="refresh" style="margin-top:12px">Refresh</button></div>`; $('#refresh').onclick=renderAdmin; return; }
   const teamsCount=new Set(logs.map(l=>(l.teamName||'').toLowerCase())).size;
   // group by team
   const groups={};
@@ -358,20 +377,18 @@ async function renderPromptsTab(){
       <div class="stat"><div class="n">${teamsCount}</div><div class="l">Teams</div></div>
     </div>
     <div class="toolbar"><button class="btn btn-ghost btn-sm" id="refresh">&#8635; Refresh</button>
-      <button class="btn btn-ghost btn-sm" id="csv">Export CSV</button><span class="spacer"></span>
-      <button class="btn btn-ghost btn-sm" id="clear" style="color:var(--danger);border-color:#e7cccc">Clear logs</button></div>`;
+      <button class="btn btn-ghost btn-sm" id="csv">Export CSV</button><span class="spacer"></span></div>`;
   for(const k of keys){
     const g=groups[k];
     html+=`<div class="team"><div class="team-head"><span class="team-tag mono">${esc(g.label)}</span><span class="team-count">${g.items.length} submission(s)</span></div>
       <ul class="roster">${g.items.map(l=>`<li>
           <span class="idea" style="margin:0;border:none;padding:0;font-size:14px">${esc(l.idea||'')}</span>
-          ${l.docUrl?`<a class="doclink" href="${esc(l.docUrl)}" target="_blank" rel="noopener">Open prompts &#8599;</a>`:'<span class="noln">no link</span>'}
+          ${l.docUrl?`<a class="doclink" href="${esc(l.docUrl)}" target="_blank" rel="noopener">Open doc &#8599;</a>`:'<span class="noln">no link</span>'}
         </li>`).join('')}</ul></div>`;
   }
   content.innerHTML=html;
   $('#refresh').onclick=renderAdmin;
-  $('#csv').onclick=()=>{ window.location='/api/prompt-export.csv?code='+encodeURIComponent(adminCode); };
-  $('#clear').onclick=async()=>{ if(!confirm('Delete every prompt log?')) return; await fetch('/api/prompt-clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:adminCode})}); renderAdmin(); };
+  $('#csv').onclick=()=>downloadAdminCsv('/api/prompt-export.csv','prompt-logs.csv').catch(()=>alert('Export failed.'));
 }
 
 /* ===================== router ===================== */
